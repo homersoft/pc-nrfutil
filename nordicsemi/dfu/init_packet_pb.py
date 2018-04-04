@@ -73,8 +73,8 @@ class InitPacketPB(object):
                  sd_size=0,
                  app_size=0,
                  bl_size=0,
-                 sd_req=None
-                 ):
+                 sd_req=None,
+                 nonce_val=None):
 
         if from_bytes is not None:
             # construct from a protobuf string/buffer
@@ -108,7 +108,7 @@ class InitPacketPB(object):
             self.init_command.sd_size = sd_size
             self.init_command.bl_size = bl_size
             self.init_command.app_size = app_size
-
+            self.init_command.nonce = nonce_val
             self.packet.command.init.CopyFrom(self.init_command)
 
         self._validate()

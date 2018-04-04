@@ -451,6 +451,10 @@ def pkg():
               help='The private (signing) key in PEM fomat.',
               required=False,
               type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False))
+@click.option('--nonce-value',
+              help='The Nonce value in hex',
+              required=True,
+              type=click.STRING)
 def generate(zipfile,
            debug_mode,
            application,
@@ -462,7 +466,8 @@ def generate(zipfile,
            sd_req,
            sd_id,
            softdevice,
-           key_file):
+           key_file,
+           nonce_value):
     """
     Generate a zip package for distribution to apps that support Nordic DFU OTA.
     The application, bootloader, and SoftDevice files are converted to .bin if supplied as .hex files.
@@ -487,6 +492,12 @@ def generate(zipfile,
     """
     zipfile_path = zipfile
 
+    nonce_value_array = bytearray.fromhex(nonce_value)
+    nonce_value_str = str(nonce_value_array)
+
+    if len(nonce_value_str) != 12:
+        click.echo("Error: Invalid nonce length given")
+        return
     # Check combinations
     if bootloader is not None and application is not None and softdevice is None:
         click.echo("Error: Invalid combination: use two .zip packages instead.")
@@ -624,7 +635,8 @@ def generate(zipfile,
                       application,
                       bootloader,
                       softdevice,
-                      key_file)
+                      key_file,
+                      nonce_value_str)
 
     package.generate_package(zipfile_path)
 

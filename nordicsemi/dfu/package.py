@@ -121,7 +121,8 @@ class Package(object):
                  app_fw=None,
                  bootloader_fw=None,
                  softdevice_fw=None,
-                 key_file=None):
+                 key_file=None,
+                 nonce_value=None):
         """
         Constructor that requires values used for generating a Nordic DFU package.
 
@@ -172,6 +173,9 @@ class Package(object):
                                      init_packet_data=init_packet_vars)
 
         self.key_file = key_file
+
+        if nonce_value:
+            self.nonce_value = nonce_value
 
         self.work_dir = None
         self.manifest = None
@@ -376,7 +380,8 @@ DFU Package: <{0}>:
                             sd_size=sd_size,
                             app_size=app_size,
                             bl_size=bl_size,
-                            sd_req=firmware_data[FirmwareKeys.INIT_PACKET_DATA][PacketField.REQUIRED_SOFTDEVICES_ARRAY])
+                            sd_req=firmware_data[FirmwareKeys.INIT_PACKET_DATA][PacketField.REQUIRED_SOFTDEVICES_ARRAY],
+                            nonce_val=self.nonce_value)
 
             if (self.key_file is not None):
                 signer = Signing()

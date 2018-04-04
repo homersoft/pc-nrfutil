@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 package dfu;
 
 // Version 0.1
@@ -42,6 +44,8 @@ message InitCommand {
 	optional Hash	hash		= 8;
     
     optional bool   is_debug    = 9 [default = false];
+
+    optional bytes  nonce       = 10;
 }
 
 message ResetCommand {
