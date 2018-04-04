@@ -90,7 +90,7 @@ class NoseTestCommand(TestCommand):
         nose.run_exit(argv=['nosetests', '--with-xunit', '--xunit-file=test-reports/unittests.xml'])
 
 setup(
-    name="nrfutil",
+    name="nrfutil-silvair",
     version=version.NRFUTIL_VERSION,
     license="Modified BSD License",
     author = "Nordic Semiconductor ASA",
@@ -131,7 +131,7 @@ setup(
     },
     entry_points='''
       [console_scripts]
-      nrfutil = nordicsemi.__main__:cli
+      nrfutil-silvair = nordicsemi.__main__:cli
     ''',
     console=[{
         "script": "./nordicsemi/__main__.py",
