@@ -62,7 +62,8 @@ HexTypeToInitPacketFwTypemap = {
     HexType.APPLICATION: DFUType.APPLICATION,
     HexType.BOOTLOADER: DFUType.BOOTLOADER,
     HexType.SOFTDEVICE: DFUType.SOFTDEVICE,
-    HexType.SD_BL: DFUType.SOFTDEVICE_BOOTLOADER
+    HexType.SD_BL: DFUType.SOFTDEVICE_BOOTLOADER,
+    HexType.EXTERNAL: DFUType.EXTERNAL
 }
 
 
@@ -71,6 +72,7 @@ class PacketField(Enum):
     HW_VERSION = 2
     FW_VERSION = 3
     REQUIRED_SOFTDEVICES_ARRAY = 4
+    APP_DATA = 5
 
 class Package(object):
     """
@@ -122,7 +124,9 @@ class Package(object):
                  bootloader_fw=None,
                  softdevice_fw=None,
                  key_file=None,
-                 nonce_value=None):
+                 nonce_value=None,
+                 external_fw=None,
+                 app_data=None):
         """
         Constructor that requires values used for generating a Nordic DFU package.
 
@@ -172,10 +176,19 @@ class Package(object):
                                      filename=softdevice_fw,
                                      init_packet_data=init_packet_vars)
 
+        if external_fw:
+            self.__add_firmware_info(firmware_type=HexType.EXTERNAL,
+                                     firmware_version=app_version,
+                                     filename=external_fw,
+                                     init_packet_data=init_packet_vars)
+
         self.key_file = key_file
 
-        if nonce_value:
-            self.nonce_value = nonce_value
+        # if nonce_value:
+        self.nonce_value = nonce_value
+
+        # if app_data:
+        self.app_data = app_data
 
         self.work_dir = None
         self.manifest = None
@@ -210,7 +223,8 @@ class Package(object):
         type_strs = {HexType.SD_BL : "sd_bl", 
                     HexType.SOFTDEVICE : "softdevice",
                     HexType.BOOTLOADER : "bootloader",
-                    HexType.APPLICATION : "application" }
+                    HexType.APPLICATION : "application",
+                    HexType.EXTERNAL : "external"}
 
         # parse init packet
         with open(os.path.join(self.zip_dir, img.dat_file), "rb") as imgf:
@@ -368,6 +382,8 @@ DFU Package: <{0}>:
             elif key == HexType.SD_BL:
                 bl_size = firmware_data[FirmwareKeys.BL_SIZE]
                 sd_size = firmware_data[FirmwareKeys.SD_SIZE]
+            elif key == HexType.EXTERNAL:
+                app_size = bin_length
 
             init_packet = InitPacketPB(
                             from_bytes = None,
@@ -381,7 +397,8 @@ DFU Package: <{0}>:
                             app_size=app_size,
                             bl_size=bl_size,
                             sd_req=firmware_data[FirmwareKeys.INIT_PACKET_DATA][PacketField.REQUIRED_SOFTDEVICES_ARRAY],
-                            nonce_val=self.nonce_value)
+                            nonce_val=self.nonce_value,
+                            app_data=self.app_data)
 
             if (self.key_file is not None):
                 signer = Signing()

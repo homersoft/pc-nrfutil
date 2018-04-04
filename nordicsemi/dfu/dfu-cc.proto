@@ -15,6 +15,7 @@ enum FwType {
 	SOFTDEVICE				= 1;
 	BOOTLOADER				= 2;
 	SOFTDEVICE_BOOTLOADER	= 3;
+	EXTERNAL_MCU            = 4;
 }
 
 enum HashType {
@@ -46,6 +47,8 @@ message InitCommand {
     optional bool   is_debug    = 9 [default = false];
 
     optional bytes  nonce       = 10;
+
+    optional bytes  app_data    = 11;
 }
 
 message ResetCommand {

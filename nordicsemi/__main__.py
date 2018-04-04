@@ -453,7 +453,13 @@ def pkg():
               type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False))
 @click.option('--nonce-value',
               help='The Nonce value in hex',
-              required=True,
+              required=False,
+              type=click.STRING)
+@click.option('--external-fw',
+              help='External MCU firmware file',
+              type=click.STRING)
+@click.option('--app-data',
+              help='Application data for external MCU',
               type=click.STRING)
 def generate(zipfile,
            debug_mode,
@@ -467,7 +473,9 @@ def generate(zipfile,
            sd_id,
            softdevice,
            key_file,
-           nonce_value):
+           nonce_value,
+           external_fw,
+           app_data):
     """
     Generate a zip package for distribution to apps that support Nordic DFU OTA.
     The application, bootloader, and SoftDevice files are converted to .bin if supplied as .hex files.
@@ -492,13 +500,41 @@ def generate(zipfile,
     """
     zipfile_path = zipfile
 
-    nonce_value_array = bytearray.fromhex(nonce_value)
-    nonce_value_str = str(nonce_value_array)
+    nonce_value_str = None
+    if nonce_value:
+        nonce_value_array = bytearray.fromhex(nonce_value)
+        nonce_value_str = str(nonce_value_array)
 
-    if len(nonce_value_str) != 12:
-        click.echo("Error: Invalid nonce length given")
-        return
+        if len(nonce_value_str) != 12:
+            click.echo("Error: Invalid nonce length given")
+            return
+
+    app_data_str = None
+    if app_data:
+        with open(app_data, "rb") as app_data_buff:
+            app_data_str = app_data_buff.read()
+
     # Check combinations
+    if application is not None and nonce_value is None:
+        click.echo("Error: Please provide nonce")
+        return
+
+    if bootloader is not None and nonce_value is None:
+        click.echo("Error: Please provide nonce")
+        return
+
+    if application is not None and app_data is not None:
+        click.echo("Error: Provided application data for Silvair application")
+        return
+
+    if bootloader is not None and app_data is not None:
+        click.echo("Error: Provided application data for Silvair bootloader")
+        return
+
+    if external_fw is not None and nonce_value_str is not None:
+        click.echo("Error: Provided nonce for external MCU")
+        return
+
     if bootloader is not None and application is not None and softdevice is None:
         click.echo("Error: Invalid combination: use two .zip packages instead.")
         return
@@ -545,7 +581,7 @@ def generate(zipfile,
             sd_id = None
 
     # Initial consistency checks
-    if application_version_internal is not None and application is None:
+    if application_version_internal is not None and application is None and external_fw is None:
         click.echo("Error: Application version with no image.")
         return
 
@@ -575,7 +611,7 @@ def generate(zipfile,
         click.echo("Error: --sd-req required.")
         return
 
-    if application is not None and application_version_internal is None:
+    if application is not None and external_fw is not None and application_version_internal is None:
         click.echo('Error: --application-version or --application-version-string'
                    ' required with application image.')
         return
@@ -636,7 +672,9 @@ def generate(zipfile,
                       bootloader,
                       softdevice,
                       key_file,
-                      nonce_value_str)
+                      nonce_value_str,
+                      external_fw,
+                      app_data_str)
 
     package.generate_package(zipfile_path)
 
