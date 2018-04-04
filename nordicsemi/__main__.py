@@ -515,6 +515,10 @@ def generate(zipfile,
             app_data_str = app_data_buff.read()
 
     # Check combinations
+    if external_fw is not None and (application is not None or bootloader is not None or softdevice is not None):
+        click.echo("Error: External fw package can't be generated with other types")
+        return
+
     if application is not None and nonce_value is None:
         click.echo("Error: Please provide nonce")
         return
