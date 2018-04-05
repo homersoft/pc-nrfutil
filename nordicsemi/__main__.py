@@ -513,6 +513,9 @@ def generate(zipfile,
     if app_data:
         with open(app_data, "rb") as app_data_buff:
             app_data_str = app_data_buff.read()
+            if len(app_data_str) > 32:
+                click.echo("Error: Too large application data file")
+                return
 
     # Check combinations
     if external_fw is not None and (application is not None or bootloader is not None or softdevice is not None):
