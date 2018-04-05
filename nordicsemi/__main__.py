@@ -414,7 +414,7 @@ def pkg():
               type=BASED_INT_OR_NONE)
 @click.option('--hw-version',
               help='The hardware version.',
-              required=True,
+              required=False,
               type=BASED_INT)
 @click.option('--sd-req',
               help='The SoftDevice requirements. A comma-separated list of SoftDevice firmware IDs '
@@ -437,7 +437,7 @@ def pkg():
                    '\n|s132_nrf52_5.0.0|0x9D|'
                    '\n|s132_nrf52_5.1.0|0xA5|',
               type=click.STRING,
-              required=True,
+              required=False,
               multiple=True)
 @click.option('--sd-id',
               help='The new SoftDevice ID to be used as --sd-req for the Application update in case the ZIP '
@@ -585,7 +585,7 @@ def generate(zipfile,
             sd_id = None
 
     # Initial consistency checks
-    if application_version_internal is not None and application is None and external_fw is None:
+    if application_version_internal is not None and application is None:
         click.echo("Error: Application version with no image.")
         return
 
@@ -606,6 +606,10 @@ def generate(zipfile,
             # Use string as this will be mapped into an int below
             sd_req=str(Package.DEFAULT_SD_REQ[0])
 
+    if external_fw:
+        application_version_internal = 0
+        hw_version = 0
+        sd_req = "0x00"
     # Version checks
     if hw_version is None:
         click.echo("Error: --hw-version required.")
@@ -627,6 +631,7 @@ def generate(zipfile,
     if application is not None and softdevice is not None and sd_id is None:
         click.echo("Error: --sd-id required with softdevice and application images.")
         return
+
 
     sd_req_list = []
     if sd_req is not None:
