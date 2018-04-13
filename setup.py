@@ -94,7 +94,7 @@ setup(
     version=version.NRFUTIL_VERSION,
     license="Modified BSD License",
     author = "Nordic Semiconductor ASA",
-    url="https://github.com/NordicSemiconductor/pc-nrfutil",
+    url="https://github.com/homersoft/pc-nrfutil/tree/ble_init_packet_update",
     description="Nordic Semiconductor nrfutil utility and Python library",
     long_description=description,
     packages=find_packages(exclude=["tests.*", "tests"]),
@@ -135,6 +135,6 @@ setup(
     ''',
     console=[{
         "script": "./nordicsemi/__main__.py",
-        "dest_base": "nrfutil"
+        "dest_base": "nrfutil-silvair"
     }],
 )
