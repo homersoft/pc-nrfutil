@@ -522,14 +522,6 @@ def generate(zipfile,
         click.echo("Error: External fw package can't be generated with other types")
         return
 
-    if application is not None and nonce_value is None:
-        click.echo("Error: Please provide nonce")
-        return
-
-    if bootloader is not None and nonce_value is None:
-        click.echo("Error: Please provide nonce")
-        return
-
     if application is not None and app_data is not None:
         click.echo("Error: Provided application data for Silvair application")
         return
