@@ -362,8 +362,13 @@ DFU Package: <{0}>:
         for key, firmware_data in self.firmwares_data.iteritems():
 
             # Normalize the firmware file and store it in the work directory
-            firmware_data[FirmwareKeys.BIN_FILENAME] = \
-                Package.normalize_firmware_to_bin(self.work_dir, firmware_data[FirmwareKeys.FIRMWARE_FILENAME])
+            if key == HexType.EXTERNAL:
+                firmware_data[FirmwareKeys.BIN_FILENAME] = \
+                    Package.normalize_firmware_to_bin(self.work_dir, firmware_data[FirmwareKeys.FIRMWARE_FILENAME],
+                                                      fixed_start_addr=True)
+            else:
+                firmware_data[FirmwareKeys.BIN_FILENAME] = \
+                    Package.normalize_firmware_to_bin(self.work_dir, firmware_data[FirmwareKeys.FIRMWARE_FILENAME])
 
             # Calculate the hash for the .bin file located in the work directory
             bin_file_path = os.path.join(self.work_dir, firmware_data[FirmwareKeys.BIN_FILENAME])
@@ -512,14 +517,14 @@ DFU Package: <{0}>:
             self.firmwares_data[firmware_type][FirmwareKeys.INIT_PACKET_DATA][PacketField.FW_VERSION] = firmware_version
 
     @staticmethod
-    def normalize_firmware_to_bin(work_dir, firmware_path):
+    def normalize_firmware_to_bin(work_dir, firmware_path, fixed_start_addr=False):
         firmware_filename = os.path.basename(firmware_path)
         new_filename = firmware_filename.replace(".hex", ".bin")
         new_filepath = os.path.join(work_dir, new_filename)
 
         if not os.path.exists(new_filepath):
             temp = nRFHex(firmware_path)
-            temp.tobinfile(new_filepath)
+            temp.tobinfile(new_filepath, fixed_start_addr=fixed_start_addr)
 
         return new_filepath
 
