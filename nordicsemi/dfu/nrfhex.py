@@ -138,10 +138,9 @@ class nRFHex(intelhex.IntelHex):
         Returns the size of the source.
         :return: int
         """
-        addr = self.addresses()
         min_address = self.minaddr()
         if fixed_start_addr:
-            min_address = min(addr)
+            min_address = min(self.addresses())
         max_address = self.maxaddr()
 
         size = max_address - min_address + 1
@@ -179,7 +178,7 @@ class nRFHex(intelhex.IntelHex):
             close_fd = False
 
         if fixed_start_addr:
-            start_address = 0
+            start_address = min(self.addresses())
             size = self.size(fixed_start_addr=fixed_start_addr)
         else:
             start_address = self.minaddr()
