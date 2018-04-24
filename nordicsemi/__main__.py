@@ -506,8 +506,7 @@ def generate(zipfile,
         nonce_value_str = str(nonce_value_array)
 
         if len(nonce_value_str) != 12:
-            print("Nonce with length {} given".format(len(nonce_value_str)))
-            click.echo("Error: Invalid nonce length given")
+            click.echo("Error: Invalid nonce length given: " + str(len(nonce_value_str)))
             return
 
     app_data_str = None
