@@ -54,7 +54,7 @@ from pc_ble_driver_py.ble_driver    import ATT_MTU_DEFAULT
 from pc_ble_driver_py.ble_adapter   import BLEAdapter, BLEAdapterObserver, EvtSync
 
 logger  = logging.getLogger(__name__)
-#logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)
 
 from pc_ble_driver_py import config
 global nrf_sd_ble_api_ver
