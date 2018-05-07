@@ -146,9 +146,10 @@ class nRFHex(intelhex.IntelHex):
         size = max_address - min_address + 1
 
         # Round up to nearest word
-        word_size = 4
-        number_of_words = (size + (word_size - 1)) / word_size
-        size = number_of_words * word_size
+        if not fixed_start_addr:
+            word_size = 4
+            number_of_words = (size + (word_size - 1)) / word_size
+            size = number_of_words * word_size
 
         return size
 
