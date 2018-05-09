@@ -128,6 +128,10 @@ nrfutil pkg generate --debug-mode --application app.hex --key-file key.pem app_d
 ```
 When using debug mode you don't need to specify versions for hardware and firmware, so you can develop without having to worry about versioning your application. If you want to generate a package for production, you will need to do so without the `--debug-mode` parameter and specify the versions:
 ```
+nrfutil pkg generate --hw-version 52 --sd-req 0x91 --application-version 10000 --application app.hex app.zip --nonce-value 000102030405060708090a0b
+```
+The option `--nonce-value` will put 12 octets nonce in init packet so it doesn't require writing it to characteristic before update
+```
 nrfutil pkg generate --hw-version 51 --sd-req 0x80 --application-version 4 --application app.hex --key-file key.pem app_dfu_package.zip
 ```
 The option `--hw-version` must correspond to the nRF5x IC used, i.e. 51 for nRF51x22 ICs and 52 for nRF52xxx  ICs
@@ -176,6 +180,16 @@ SD + APP      | Yes       | **See notes 1 and 2 below**
 **Note 2:** When updating SD (+ BL) + APP the update is done in 2 following connections, unless a custom bootloader is used. First the SD (+ BL) is updated, then the bootloader will disconnect and the (new) BL will start advertising. Second connection to the bootloader will update the APP. However, the two SDs may have different IDs. The first update requires `--sd-req` to be set to the ID of the old SD. Update of the APP requires the ID of the new SD. In that case the new ID must be set using `--sd-id` parameter. This parameter is
 was added in nrfutil 3.1.0 and is required since 3.2.0 in case the package should contain SD (+ BL) + APP. Also, since version 3.2.0 the new ID is copied to `--sd-req` list so that
 in case of a link loss during APP update the DFU process can be restarted. In that case the new SD would overwrite itself, so `--sd-req` must contain also the ID of the new SD.
+
+#### external-fw
+Command pkg generate can be used with `external-fw` argument. It will generate image for updating external mcu.
+```
+nrfutil pkg generate --external-fw external_app.hex external_app.zip
+```
+Option `external-fw` can be followed by `--app-data` option which points to binary file with application data for external mcu
+```
+nrfutil pkg generate --external-fw external_app.hex external_app.zip --app-data data.bin
+```
 
 ##### display
 Use this option to display the contents of a DFU package in a .zip file.
