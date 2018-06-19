@@ -845,7 +845,12 @@ def get_port_by_snr(snr):
               help='Flash connectivity firmware automatically. Default: disabled.',
               type=click.BOOL,
               is_flag=True)
-def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity):
+@click.option('-prn', '--packet_notification',
+              help='Use packet receipt notification mechanism. Default: 0 (disabled).',
+              type=click.INT,
+              required=False,
+              default=0)
+def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity, packet_notification):
     """
     Perform a Device Firmware Update on a device with a bootloader that supports BLE DFU.
     This requires a second nRF device, connected to this computer, with connectivity firmware
@@ -879,7 +884,8 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
     logger.info("Using connectivity board at serial port: {}".format(port))
     ble_backend = DfuTransportBle(serial_port=str(port),
                                   target_device_name=str(name),
-                                  target_device_addr=str(address))
+                                  target_device_addr=str(address),
+                                  prn=packet_notification)
     ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
     dfu = Dfu(zip_file_path = package, dfu_transport = ble_backend, connect_delay = connect_delay)
 
