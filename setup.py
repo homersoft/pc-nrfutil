@@ -76,7 +76,13 @@ dll_excludes = [
 build_dir = os.environ.get("NRFUTIL_BUILD_DIR", "./{}".format(version.NRFUTIL_VERSION))
 description = """A Python package that includes the nrfutil utility and the nordicsemi library"""
 
-with open("requirements.txt") as reqs_file:
+if platform.system().lower() == "linux":
+    REQUIREMENTS_FILE = "requirements_linux.txt"
+
+elif platform.system().lower() == "windows":
+    REQUIREMENTS_FILE = "requirements.txt"
+
+with open(REQUIREMENTS_FILE) as reqs_file:
     reqs = reqs_file.readlines()
 
 class NoseTestCommand(TestCommand):

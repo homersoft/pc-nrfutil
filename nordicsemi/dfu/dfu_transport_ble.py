@@ -44,6 +44,7 @@ import Queue
 import struct
 import logging
 import binascii
+import platform
 
 from types                          import NoneType
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
@@ -60,9 +61,9 @@ from pc_ble_driver_py import config
 global nrf_sd_ble_api_ver
 nrf_sd_ble_api_ver = config.sd_api_ver_get()
 
-import platform
+
 if platform.system().lower() == "linux":
-    from bluez import BluezBleAdapter
+    from nordicsemi.dfu.bluez import BluezBleAdapter
 
 
 class ValidationException(NordicSemiException):
@@ -452,8 +453,8 @@ class DfuTransportBle(DfuTransport):
         if platform.system().lower() == "linux":
             adapter = BluezBleAdapter()
         else:
-            driver           = DfuBLEDriver(serial_port = self.serial_port, baud_rate   = self.baud_rate)
-            adapter          = BLEAdapter(driver)
+            driver  = DfuBLEDriver(serial_port = self.serial_port, baud_rate   = self.baud_rate)
+            adapter = BLEAdapter(driver)
 
         self.dfu_adapter = DFUAdapter(adapter=adapter, bonded=self.bonded, keyset=self.keyset)
         self.dfu_adapter.open()
