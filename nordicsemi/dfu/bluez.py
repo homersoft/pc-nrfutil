@@ -264,6 +264,7 @@ class BleAdapter(object):
         :param name: str, e.g. hci0
         """
         self._bus = bus
+        self._adapter_path = adapter_path
         self._dbus_obj = bus.get_object("org.bluez", adapter_path)
         self._dbus_if = dbus.Interface(self._dbus_obj, BLUEZ_ADAPTER_IF)
         self._dbus_prop_if = dbus.Interface(self._dbus_obj, DBUS_PROPERTIES_IF)
@@ -273,7 +274,11 @@ class BleAdapter(object):
 
         :param device_path: str, path to the device to be removed.
         """
-        self._dbus_if.RemoveDevice(device_path)
+        try:
+            self._dbus_if.RemoveDevice(device_path)
+        except Exception:
+            pass
+
 
     def clear_last_discovery_results(self):
         """ Clear last discovery result. """
@@ -314,7 +319,8 @@ class BleAdapter(object):
 
         :return: list<BleDevice>, list of BLE devices.
         """
-        return [BleDevice(self._bus, dev_path) for dev_path in find_ble_devices(get_bluez_objects(self._bus))]
+        all_devices = [BleDevice(self._bus, dev_path) for dev_path in find_ble_devices(get_bluez_objects(self._bus))]
+        return [dev for dev in all_devices if self._adapter_path in dev.device_path]
 
     @classmethod
     def first_adapter(cls):

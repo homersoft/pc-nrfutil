@@ -10,4 +10,4 @@ tqdm
 piccata
 pyspinel == 1.0.0a1
 dbus-python
-pygi
+pygobject
