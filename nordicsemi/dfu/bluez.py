@@ -201,7 +201,7 @@ class BleDevice(object):
     def discover_services(self):
         """ Perform service discovery procedure. """
 
-        timeout = 5
+        timeout = 10
         end_time = time.time() + timeout
         while time.time() < end_time:
             if self.services_resolved:
@@ -370,6 +370,7 @@ class BluezConnection(object):
 
 
 class BluezConnectionManager(object):
+    """ Class keeps information about connections. """
 
     def __init__(self):
         # Current implmentation handle only one connection.

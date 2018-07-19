@@ -868,11 +868,11 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
       if port is None and jlink_snr is not None:
           port = get_port_by_snr(jlink_snr)
 
-    elif port is None:
-        port = enumerate_ports()
-        if port is None:
-            click.echo("\nNo Segger USB CDC ports found, please connect your board.")
-            return
+      elif port is None:
+          port = enumerate_ports()
+          if port is None:
+              click.echo("\nNo Segger USB CDC ports found, please connect your board.")
+              return
 
     if flash_connectivity and platform.system().lower() != "linux":
         flasher = Flasher(serial_port=port, snr = jlink_snr)
