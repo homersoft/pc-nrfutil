@@ -44,7 +44,6 @@ import Queue
 import struct
 import logging
 import binascii
-import platform
 
 from types                          import NoneType
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
@@ -60,10 +59,6 @@ logger.setLevel(logging.DEBUG)
 from pc_ble_driver_py import config
 global nrf_sd_ble_api_ver
 nrf_sd_ble_api_ver = config.sd_api_ver_get()
-
-
-if platform.system().lower() == "linux":
-    from nordicsemi.dfu.bluez import BluezBleAdapter
 
 
 class ValidationException(NordicSemiException):
@@ -224,7 +219,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
             True if connected, else False.
 
         """
-        self.conn_handle = self.evt_sync.wait('connected', timeout=30)
+        self.conn_handle = self.evt_sync.wait('connected')
         if self.conn_handle is not None:
             retries = DFUAdapter.CONNECTION_ATTEMPTS
             while retries:
@@ -432,7 +427,6 @@ class DfuTransportBle(DfuTransport):
                  target_device_addr=None,
                  baud_rate=115200,
                  prn=0):
-
         super(DfuTransportBle, self).__init__()
         self.baud_rate          = baud_rate
         self.serial_port        = serial_port
@@ -449,13 +443,9 @@ class DfuTransportBle(DfuTransport):
             raise IllegalStateException('DFU Adapter is already open')
 
         super(DfuTransportBle, self).open()
-
-        if platform.system().lower() == "linux":
-            adapter = BluezBleAdapter()
-        else:
-            driver  = DfuBLEDriver(serial_port = self.serial_port, baud_rate   = self.baud_rate)
-            adapter = BLEAdapter(driver)
-
+        driver           = DfuBLEDriver(serial_port = self.serial_port,
+                                        baud_rate   = self.baud_rate)
+        adapter          = BLEAdapter(driver)
         self.dfu_adapter = DFUAdapter(adapter=adapter, bonded=self.bonded, keyset=self.keyset)
         self.dfu_adapter.open()
         self.target_device_name, self.target_device_addr = self.dfu_adapter.connect(

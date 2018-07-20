@@ -43,7 +43,6 @@ import sys
 import click
 import time
 import logging
-import platform
 import subprocess
 sys.path.append(os.getcwd())
 
@@ -862,19 +861,16 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
         name = 'DfuTarg'
         click.echo("No target selected. Default device name: {} is used.".format(name))
 
-    if platform.system().lower() == "linux":
-      port="/dev/null"
-    else:
-      if port is None and jlink_snr is not None:
-          port = get_port_by_snr(jlink_snr)
+    if port is None and jlink_snr is not None:
+        port = get_port_by_snr(jlink_snr)
 
-      elif port is None:
-          port = enumerate_ports()
-          if port is None:
-              click.echo("\nNo Segger USB CDC ports found, please connect your board.")
-              return
+    elif port is None:
+        port = enumerate_ports()
+        if port is None:
+            click.echo("\nNo Segger USB CDC ports found, please connect your board.")
+            return
 
-    if flash_connectivity and platform.system().lower() != "linux":
+    if flash_connectivity:
         flasher = Flasher(serial_port=port, snr = jlink_snr)
         if flasher.fw_check():
             click.echo("Board already flashed with connectivity firmware.")
