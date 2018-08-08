@@ -7,3 +7,6 @@ venv/
 build/
 dist/
 nrfutil.egg-info/
+
+# PyCharm
+.idea

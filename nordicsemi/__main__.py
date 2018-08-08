@@ -43,6 +43,7 @@ import sys
 import click
 import time
 import logging
+import platform
 import subprocess
 sys.path.append(os.getcwd())
 
@@ -824,7 +825,7 @@ def get_port_by_snr(snr):
 @click.option('-ic', '--conn-ic-id',
               help='Connectivity IC family: NRF51 or NRF52',
               type=click.Choice(['NRF51', 'NRF52']),
-              required=True)
+              required=False)
 @click.option('-p', '--port',
               help='Serial port COM port to which the connectivity IC is connected.',
               type=click.STRING)
@@ -850,44 +851,73 @@ def get_port_by_snr(snr):
               type=click.INT,
               required=False,
               default=0)
-def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity, packet_notification):
+@click.option('-bz', '--bluez',
+             type=click.BOOL,
+             required=False,
+             default=False,
+             is_flag=True)
+def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity, packet_notification, bluez):
     """
     Perform a Device Firmware Update on a device with a bootloader that supports BLE DFU.
     This requires a second nRF device, connected to this computer, with connectivity firmware
     loaded. The connectivity device will perform the DFU procedure onto the target device.
     """
-    ble_driver_init(conn_ic_id)
-    if name is None and address is None:
-        name = 'DfuTarg'
-        click.echo("No target selected. Default device name: {} is used.".format(name))
+    if bluez:
+        if platform.system().lower() != "linux":
+            logger.error("BlueZ is not support on platform: %s", platform.system().lower())
+            exit(1)
 
-    if port is None and jlink_snr is not None:
-        port = get_port_by_snr(jlink_snr)
+        ble_driver_init("NRF52")
+        if name is None and address is None:
+            name = 'DfuTarg'
+            click.echo("No target selected. Default device name: {} is used.".format(name))
 
-    elif port is None:
-        port = enumerate_ports()
-        if port is None:
-            click.echo("\nNo Segger USB CDC ports found, please connect your board.")
+        logger.info("Using transport: BlueZ.")
+        ble_backend = DfuTransportBle(serial_port=None,
+                                      target_device_name=None,
+                                      target_device_addr=str(address),
+                                      prn=packet_notification,
+                                      bluez=True)
+        ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
+        dfu = Dfu(zip_file_path = package, dfu_transport = ble_backend, connect_delay = connect_delay)
+
+    else:
+        if not conn_ic_id:
+            logger.error("Error: Missing option \"-ic\" / \"--conn-ic-id\".  Choose from NRF51, NRF52.")
             return
 
-    if flash_connectivity:
-        flasher = Flasher(serial_port=port, snr = jlink_snr)
-        if flasher.fw_check():
-            click.echo("Board already flashed with connectivity firmware.")
-        else:
-            click.echo("Flashing connectivity firmware...")
-            flasher.fw_flash()
-            click.echo("Connectivity firmware flashed.")
-        flasher.reset()
-        time.sleep(1)
+        ble_driver_init(conn_ic_id)
+        if name is None and address is None:
+            name = 'DfuTarg'
+            click.echo("No target selected. Default device name: {} is used.".format(name))
 
-    logger.info("Using connectivity board at serial port: {}".format(port))
-    ble_backend = DfuTransportBle(serial_port=str(port),
-                                  target_device_name=str(name),
-                                  target_device_addr=str(address),
-                                  prn=packet_notification)
-    ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
-    dfu = Dfu(zip_file_path = package, dfu_transport = ble_backend, connect_delay = connect_delay)
+        if port is None and jlink_snr is not None:
+            port = get_port_by_snr(jlink_snr)
+
+        elif port is None:
+            port = enumerate_ports()
+            if port is None:
+                click.echo("\nNo Segger USB CDC ports found, please connect your board.")
+                return
+
+        if flash_connectivity:
+            flasher = Flasher(serial_port=port, snr = jlink_snr)
+            if flasher.fw_check():
+                click.echo("Board already flashed with connectivity firmware.")
+            else:
+                click.echo("Flashing connectivity firmware...")
+                flasher.fw_flash()
+                click.echo("Connectivity firmware flashed.")
+            flasher.reset()
+            time.sleep(1)
+
+        logger.info("Using connectivity board at serial port: {}".format(port))
+        ble_backend = DfuTransportBle(serial_port=str(port),
+                                      target_device_name=str(name),
+                                      target_device_addr=str(address),
+                                      prn=packet_notification)
+        ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
+        dfu = Dfu(zip_file_path = package, dfu_transport = ble_backend, connect_delay = connect_delay)
 
     if logger.getEffectiveLevel() > logging.INFO:
         with click.progressbar(length=dfu.dfu_get_total_size()) as bar:
