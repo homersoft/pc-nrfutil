@@ -102,6 +102,10 @@ setup(
                 '': ['../requirements.txt', 'thread/hex/ncp.hex']
     },
     install_requires=reqs,
+    extras_require={
+        "DBUS": ["dbus-python==1.2.8",
+                 "PyGObject==3.28.3"]
+    },
     zipfile=None,
     tests_require=[
         "nose >= 1.3.4",
