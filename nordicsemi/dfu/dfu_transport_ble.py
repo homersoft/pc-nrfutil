@@ -547,6 +547,7 @@ class DfuTransportBle(DfuTransport):
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=response['offset'])
 
         response = self.__select_data()
+        response['crc'] = 0
         try_to_recover()
 
         for i in range(response['offset'], len(firmware), response['max_size']):
