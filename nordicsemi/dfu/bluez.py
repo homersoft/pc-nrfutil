@@ -119,12 +119,14 @@ class BleGattCharacteristic(object):
         """
         self._notification_handlers.append(handler)
 
-    def write(self, data):
+    def write(self, data, with_response=False):
         """ Write data to characteristic.
 
         :param data: bytearray, data to be written
+        :param with_response: bool, data will be written to characteristic with acknowledge (handled by bluez)
         """
         options = dbus.types.Dictionary()
+        options["type"] = "request" if with_response else "command"
 
         self._dbus_if.WriteValue(data, options)
 
@@ -733,7 +735,7 @@ class BluezBleAdapter(object):
         :return: BLEGattStatusCode
         """
         char = self._get_characteristic_with_uuid(self._get_conn_by_conn_handle(conn_handle), uuid)
-        char.write(data)
+        char.write(data, with_response=True)
 
         return BLEGattStatusCode.success
 
@@ -747,7 +749,7 @@ class BluezBleAdapter(object):
         :return: BLEGattStatusCode
         """
         char = self._get_characteristic_with_uuid(self._get_conn_by_conn_handle(conn_handle), uuid)
-        char.write(data)
+        char.write(data, with_response=False)
 
         return BLEGattStatusCode.success
 
