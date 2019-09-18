@@ -123,6 +123,7 @@ class BleGattCharacteristic(object):
         """ Write data to characteristic.
 
         :param data: bytearray, data to be written
+        :param with_response: bool, data will be written to characteristic with acknowledge (handled by bluez)
         """
         options = dbus.types.Dictionary()
         options["type"] = "request" if with_response else "command"
