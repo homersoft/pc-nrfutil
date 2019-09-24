@@ -3,6 +3,7 @@ import functools
 import logging
 import threading
 import time
+import re
 from uuid import UUID
 
 import dbus
@@ -18,6 +19,8 @@ from pc_ble_driver_py.observers import BLEAdapterObserver, BLEDriverObserver
 
 logger = logging.getLogger(__name__)
 
+BLUEZ_SERVICE = "org.bluez"
+ROOT_OBJ = "/"
 
 DBUS_OBJECT_MANAGER_IF = "org.freedesktop.DBus.ObjectManager"
 DBUS_PROPERTIES_IF = "org.freedesktop.DBus.Properties"
@@ -65,7 +68,7 @@ def get_bluez_objects(bus):
     :param bus: path to bus.
     :return: dbus.Dictionary<dbus.String, dbus.Dictionary>, paths to objects
     """
-    obj = bus.get_object("org.bluez", "/")
+    obj = bus.get_object(BLUEZ_SERVICE, ROOT_OBJ)
     obj_mgr_if = dbus.Interface(obj, DBUS_OBJECT_MANAGER_IF)
 
     return obj_mgr_if.GetManagedObjects()
@@ -106,7 +109,7 @@ class BleGattCharacteristic(object):
         self._bus = bus
         self._if = GATT_CHARACTERISTIC_IF
         self._char_path = char_path
-        self._dbus_obj = bus.get_object("org.bluez", char_path)
+        self._dbus_obj = bus.get_object(BLUEZ_SERVICE, char_path)
         self._dbus_if = dbus.Interface(self._dbus_obj, self._if)
         self._dbus_prop_if = dbus.Interface(self._dbus_obj, DBUS_PROPERTIES_IF)
 
@@ -172,7 +175,7 @@ class BleDevice(object):
         self._bus = bus
         self._if = BLUEZ_DEV_IF
         self._device_path = device_path
-        self._dbus_obj = bus.get_object("org.bluez", device_path)
+        self._dbus_obj = bus.get_object(BLUEZ_SERVICE, device_path)
         self._dbus_if = dbus.Interface(self._dbus_obj, self._if)
         self._dbus_prop_if = dbus.Interface(self._dbus_obj, DBUS_PROPERTIES_IF)
 
@@ -185,7 +188,7 @@ class BleDevice(object):
             return True
 
         except DBusException as err:
-            logger.error("%s: %s", err.get_dbus_name(), err.get_dbus_message())
+            logger.error("[Connect] %s: %s", err.get_dbus_name(), err.get_dbus_message())
             return False
 
     def disconnect(self):
@@ -195,7 +198,7 @@ class BleDevice(object):
             return True
 
         except DBusException as err:
-            logger.error("%s: %s", err.get_dbus_name(), err.get_dbus_message())
+            logger.error("[Disconnect] %s: %s", err.get_dbus_name(), err.get_dbus_message())
             return False
 
     def discover_services(self):
@@ -256,18 +259,67 @@ class BleDevice(object):
         return "{} [{}]".format(self.name, self.address)
 
 
+class BluezDBUSObjectManager(object):
+    """ Wrapper for BlueZ DBUS Object Manager. """
+
+    def __init__(self, bus):
+        self._bus = bus
+        self._dbus_obj = bus.get_object(BLUEZ_SERVICE, ROOT_OBJ)
+        self._dbus_if = dbus.Interface(self._dbus_obj, DBUS_OBJECT_MANAGER_IF)
+
+    def connect_to_signal(self, signal_name, callback):
+        """ Connect to DBUS signal.
+
+        :param signal_name: str, DBUS signal name.
+        :param callback: Callable, callback that will be called on signal emit.
+        """
+        self._dbus_if.connect_to_signal(signal_name, callback)
+
+
 class BleAdapter(object):
     """ Wrapper that simplify DBUS adapter API. """
 
     def __init__(self, bus, adapter_path):
         """
-        :param name: str, e.g. hci0
+        :param bus: dbus.Bus, DBUS bus object
+        :param adapter_path: str, path to adapter
         """
         self._bus = bus
         self._adapter_path = adapter_path
-        self._dbus_obj = bus.get_object("org.bluez", adapter_path)
+        self._dbus_obj = bus.get_object(BLUEZ_SERVICE, adapter_path)
         self._dbus_if = dbus.Interface(self._dbus_obj, BLUEZ_ADAPTER_IF)
-        self._dbus_prop_if = dbus.Interface(self._dbus_obj, DBUS_PROPERTIES_IF)
+
+        self._found_dev_re = re.compile(r"^" + adapter_path + r"/dev_([0-9A-F_]{17})$")
+
+        self._discovering_in_progress = False
+        self._on_device_found_cbk = None
+
+        BluezDBUSObjectManager(bus).connect_to_signal("InterfacesAdded", self.__dbus_if_added)
+
+    def register_on_device_found_callback(self, callback):
+        """ Register on device found callback. 
+
+        :param callback: Callable, callback that will be called on device found event.
+        """
+        self._on_device_found_cbk = callback
+
+    def __dbus_if_added(self, path, data_dict):
+        """ Callback function called on signal InterfacesAdded. 
+
+        :param path: str, path to added object.
+        :param data_dict: dict, dictionary describing interfaces added to the new object.
+        """
+        if not self._discovering_in_progress:
+            return
+
+        dev_match_obj = self._found_dev_re.match(path)
+
+        if dev_match_obj is not None:
+            addr = dev_match_obj.group(1).replace("_", "").lower()
+            dev = BleDevice(self._bus, path)
+
+            if self._on_device_found_cbk is not None:
+                self._on_device_found_cbk(addr, dev)
 
     def remove_device(self, device_path):
         """ Remove device object.
@@ -276,9 +328,8 @@ class BleAdapter(object):
         """
         try:
             self._dbus_if.RemoveDevice(device_path)
-        except Exception:
-            pass
-
+        except DBusException as err:
+            logger.error("[RemoveDevice] %s: %s", err.get_dbus_name(), err.get_dbus_message())
 
     def clear_last_discovery_results(self):
         """ Clear last discovery result. """
@@ -294,11 +345,12 @@ class BleAdapter(object):
         self.clear_last_discovery_results()
 
         try:
+            self._discovering_in_progress = True
             self._dbus_if.StartDiscovery()
             return True
 
         except DBusException as err:
-            logger.error("%s: %s", err.get_dbus_name(), err.get_dbus_message())
+            logger.error("[StartDiscovery] %s: %s", err.get_dbus_name(), err.get_dbus_message())
             return False
 
     def stop_discovery(self):
@@ -308,10 +360,11 @@ class BleAdapter(object):
         """
         try:
             self._dbus_if.StopDiscovery()
+            self._discovering_in_progress = False
             return True
 
         except DBusException as err:
-            logger.error("%s: %s", err.get_dbus_name(), err.get_dbus_message())
+            logger.error("[StopDiscovery] %s: %s", err.get_dbus_name(), err.get_dbus_message())
             return False
 
     def devices(self):
@@ -319,8 +372,8 @@ class BleAdapter(object):
 
         :return: list<BleDevice>, list of BLE devices.
         """
-        all_devices = [BleDevice(self._bus, dev_path) for dev_path in find_ble_devices(get_bluez_objects(self._bus))]
-        return [dev for dev in all_devices if self._adapter_path in dev.device_path]
+        return [BleDevice(self._bus, path) for path, _ in get_bluez_objects(self._bus).items() if self._found_dev_re.match(path)]
+
 
     @classmethod
     def first_adapter(cls):
@@ -397,17 +450,25 @@ class BluezDriver(object):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
         self._ble_adapter = BleAdapter.first_adapter()
-
-        self._scanning_in_progress_evt = threading.Event()
-        self._scanning_in_progress_evt.clear()
+        self._ble_adapter.register_on_device_found_callback(self.on_device_found)
 
         self._main_loop_thread = None
-        self._scanner_thread = None
 
         self.observers = list()
         self.devices   = dict()
 
         self.conn_manager = BluezConnectionManager()
+
+    def on_device_found(self, addr, dev):
+        self.devices[addr] = dev
+
+        addr_type = BLEGapAddr.Types.random_static # Address type is not important
+        addr = bytearray(binascii.unhexlify(addr))
+
+        peer_addr = BLEGapAddr(addr_type, addr)
+
+        for obs in self.observers:
+            obs.on_gap_evt_adv_report(self, None, peer_addr, dev.rssi, None, BLEAdvData())
 
     def __main_loop(self):
         """ Thread with main loop.
@@ -415,31 +476,6 @@ class BluezDriver(object):
         """
         loop = GLib.MainLoop()
         loop.run()
-
-    def __device_scanner(self):
-        """ Thread with device scanner."""
-        self._scanning_in_progress_evt.set()
-
-        while self._scanning_in_progress_evt.is_set():
-            self.devices = {dev.address.replace(":", "").lower(): dev for dev in self._ble_adapter.devices()}
-
-            for _, dev in self.devices.items():
-                addr_type = BLEGapAddr.Types.public
-                addr = bytearray(binascii.unhexlify(dev.address.replace(":", "")))
-
-                peer_addr = BLEGapAddr(addr_type, addr)
-                rssi = dev.rssi
-
-                adv_type = None
-                adv_data = BLEAdvData()
-
-                for obs in self.observers:
-                    obs.on_gap_evt_adv_report(self, None, peer_addr, rssi, adv_type, adv_data)
-
-                if not self._scanning_in_progress_evt.is_set():
-                    return
-
-            time.sleep(0.2)
 
     def observer_register(self, observer):
         """ Register observer.
@@ -461,7 +497,7 @@ class BluezDriver(object):
 
     def close(self):
         """ Close driver. """
-        self.__stop_scanner_thread()
+        self.ble_gap_scan_stop()
         self.__stop_main_thread()
 
     def ble_enable(self, ble_enable_params):
@@ -475,11 +511,9 @@ class BluezDriver(object):
     def ble_gap_scan_start(self):
         """ Start scanning for devices. """
         self._ble_adapter.start_discovery()
-        self.__start_scanner_thread()
 
     def ble_gap_scan_stop(self):
         """ Stop scanning for devices. """
-        self.__stop_scanner_thread()
         self._ble_adapter.stop_discovery()
 
     def ble_gap_connect(self, address, scan_params, conn_params):
@@ -490,7 +524,7 @@ class BluezDriver(object):
         :param scan_params: None, scan parameters 
         :param conn_params: BLEGapConnParams, connection parameters
         """
-        self._scanning_in_progress_evt.clear()
+        self.ble_gap_scan_stop()
 
         dev = self.devices[binascii.hexlify(address.addr)]
         if dev is None:
@@ -529,29 +563,6 @@ class BluezDriver(object):
         :param conn_handle: int, connection handle
         """
         return self.conn_manager.get_connection(conn_handle)
-
-    def __start_scanner_thread(self):
-        """ Start scanner thread. """
-        if self._scanner_thread is not None:
-            raise ValueError("Could not start thread. Looks like other scanner thread has not been finished.")
-
-        self._scanner_thread = threading.Thread(target=self.__device_scanner)
-        self._scanner_thread.daemon = True
-        self._scanner_thread.start()
-
-    def __stop_scanner_thread(self):
-        """ Stop scanner thread. """
-        if self._scanner_thread is None:
-            return
-
-        if not self._scanner_thread.is_alive():
-            self._scanner_thread = None
-            return
-
-        self._scanning_in_progress_evt.clear()
-
-        self._scanner_thread.join(timeout=5)
-        self._scanner_thread = None
 
     def __start_main_thread(self):
         """ Start main thread. """
