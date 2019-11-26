@@ -837,8 +837,9 @@ def get_port_by_snr(snr):
               help='Device name.',
               type=click.STRING)
 @click.option('-a', '--address',
-              help='BLE address of the DFU target device.',
-              type=click.STRING)
+              help='BLE address of the DFU target device. There can be multiple addresses provided.',
+              type=click.STRING,
+              multiple=True)
 @click.option('-snr', '--jlink_snr',
               help='Jlink serial number for the connectivity IC.',
               type=click.STRING)
@@ -871,11 +872,11 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
         if name is None and address is None:
             name = 'DfuTarg'
             click.echo("No target selected. Default device name: {} is used.".format(name))
-
+        logger.critical(address)
         logger.info("Using transport: BlueZ.")
         ble_backend = DfuTransportBle(serial_port=None,
                                       target_device_name=None,
-                                      target_device_addr=str(address),
+                                      target_device_addr=address,
                                       prn=packet_notification,
                                       bluez=True)
         ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
@@ -914,7 +915,7 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
         logger.info("Using connectivity board at serial port: {}".format(port))
         ble_backend = DfuTransportBle(serial_port=str(port),
                                       target_device_name=str(name),
-                                      target_device_addr=str(address),
+                                      target_device_addr=address,
                                       prn=packet_notification)
         ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
         dfu = Dfu(zip_file_path = package, dfu_transport = ble_backend, connect_delay = connect_delay)

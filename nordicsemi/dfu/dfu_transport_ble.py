@@ -127,15 +127,15 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.adapter.driver.observer_unregister(self)
         self.adapter.driver.close()
 
-    def connect(self, target_device_name, target_device_addr):
+    def connect(self, target_device_name, target_device_addr_list):
         """ Connect to Bootloader or Application with Buttonless Service.
 
         Args:
             target_device_name (str): Device name to scan for.
-            target_device_addr (str): Device addr to scan for.
+            target_device_addr List[str]: Device addresses to scan for.
         """
         self.target_device_name = target_device_name
-        self.target_device_addr = target_device_addr
+        self.target_device_addr_list = target_device_addr_list
 
         logger.info('BLE: Scanning for {}'.format(self.target_device_name))
         self.adapter.driver.ble_gap_scan_start()
@@ -364,7 +364,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         address_string  = "".join("{0:02X}".format(b) for b in peer_addr.addr)
         logger.info('Received advertisement report, address: 0x{}, device_name: {}'.format(address_string, dev_name))
 
-        if (dev_name == self.target_device_name) or (address_string == self.target_device_addr):
+        if (dev_name == self.target_device_name) or (address_string in self.target_device_addr_list):
             self.conn_params = BLEGapConnParams(min_conn_interval_ms = 7.5,
                                                 max_conn_interval_ms = 30,
                                                 conn_sup_timeout_ms  = 4000,
@@ -433,7 +433,8 @@ class DfuTransportBle(DfuTransport):
         self.baud_rate          = baud_rate
         self.serial_port        = serial_port
         self.target_device_name = target_device_name
-        self.target_device_addr = target_device_addr
+        self.target_device_addr = None
+        self.target_device_addr_list = target_device_addr
         self.dfu_adapter        = None
         self.prn                = prn
         self.bluez              = bluez
@@ -458,7 +459,7 @@ class DfuTransportBle(DfuTransport):
         self.dfu_adapter.open()
         self.target_device_name, self.target_device_addr = self.dfu_adapter.connect(
                                                         target_device_name = self.target_device_name,
-                                                        target_device_addr = self.target_device_addr)
+                                                        target_device_addr_list = self.target_device_addr_list)
         self.__set_prn()
 
     def close(self):
