@@ -433,8 +433,8 @@ class DfuTransportBle(DfuTransport):
         self.baud_rate          = baud_rate
         self.serial_port        = serial_port
         self.target_device_name = target_device_name
-        self.target_device_addr = None
         self.target_device_addr_list = target_device_addr
+        self.target_device_addr = None
         self.dfu_adapter        = None
         self.prn                = prn
         self.bluez              = bluez
