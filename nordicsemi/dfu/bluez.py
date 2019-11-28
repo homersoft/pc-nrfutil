@@ -387,8 +387,7 @@ class BleAdapter(object):
 
         if not len(available_adapters):
             raise ValueError("Could not find any Bluetooth adapter.")
-        logger.critical(available_adapters)
-        logger.critical("Using adapter %s" % available_adapters[0])
+
         return cls(bus, available_adapters[0])
 
 

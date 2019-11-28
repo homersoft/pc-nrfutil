@@ -872,7 +872,7 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
         if name is None and address is None:
             name = 'DfuTarg'
             click.echo("No target selected. Default device name: {} is used.".format(name))
-        logger.critical(address)
+
         logger.info("Using transport: BlueZ.")
         ble_backend = DfuTransportBle(serial_port=None,
                                       target_device_name=None,
