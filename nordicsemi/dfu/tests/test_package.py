@@ -53,10 +53,7 @@ class TestPackage(unittest.TestCase):
         shutil.rmtree(self.work_directory, ignore_errors=True)
 
     def test_generate_package_application(self):
-        self.p = Package(
-            dev_type=1,
-            dev_rev=2,
-            app_version=100,
+        self.p = Package(app_version=100,
             sd_req=[0x1000, 0xfffe],
             app_fw="firmwares/bar.hex",
             key_file="key.pem"
@@ -64,7 +61,7 @@ class TestPackage(unittest.TestCase):
 
         pkg_name = "mypackage.zip"
 
-        self.p.generate_package(pkg_name, preserve_work_directory=False)
+        self.p.generate_package(pkg_name, preserve_work_dir=False)
         expected_zip_content = ["manifest.json", "bar.bin", "bar.dat"]
 
         with ZipFile(pkg_name, 'r') as pkg:
@@ -79,16 +76,14 @@ class TestPackage(unittest.TestCase):
 
             with open(os.path.join(self.work_directory, 'manifest.json'), 'r') as f:
                 _json = json.load(f)
-                self.assertEqual(u'bar.bin', _json['manifest']['application']['bin_file'])
-                self.assertEqual(u'bar.dat', _json['manifest']['application']['dat_file'])
-                self.assertTrue(u'softdevice' not in _json['manifest'])
-                self.assertTrue(u'softdevice_bootloader' not in _json['manifest'])
-                self.assertTrue(u'bootloader' not in _json['manifest'])
+                self.assertEqual('bar.bin', _json['manifest']['application']['bin_file'])
+                self.assertEqual('bar.dat', _json['manifest']['application']['dat_file'])
+                self.assertTrue('softdevice' not in _json['manifest'])
+                self.assertTrue('softdevice_bootloader' not in _json['manifest'])
+                self.assertTrue('bootloader' not in _json['manifest'])
 
     def test_generate_package_sd_bl(self):
-        self.p = Package(dev_type=1,
-                         dev_rev=2,
-                         app_version=100,
+        self.p = Package(app_version=100,
                          sd_req=[0x1000, 0xfffe],
                          softdevice_fw="firmwares/foo.hex",
                          bootloader_fw="firmwares/bar.hex",
@@ -97,7 +92,7 @@ class TestPackage(unittest.TestCase):
 
         pkg_name = "mypackage.zip"
 
-        self.p.generate_package(pkg_name, preserve_work_directory=False)
+        self.p.generate_package(pkg_name, preserve_work_dir=False)
 
         expected_zip_content = ["manifest.json", "sd_bl.bin", "sd_bl.dat"]
 
@@ -113,55 +108,49 @@ class TestPackage(unittest.TestCase):
 
             with open(os.path.join(self.work_directory, 'manifest.json'), 'r') as f:
                 _json = json.load(f)
-                self.assertEqual(u'sd_bl.bin', _json['manifest']['softdevice_bootloader']['bin_file'])
-                self.assertEqual(u'sd_bl.dat', _json['manifest']['softdevice_bootloader']['dat_file'])
+                self.assertEqual('sd_bl.bin', _json['manifest']['softdevice_bootloader']['bin_file'])
+                self.assertEqual('sd_bl.dat', _json['manifest']['softdevice_bootloader']['dat_file'])
 
     def test_unpack_package_a(self):
-        self.p = Package(dev_type=1,
-                         dev_rev=2,
-                         app_version=100,
+        self.p = Package(app_version=100,
                          sd_req=[0x1000, 0xffff],
                          softdevice_fw="firmwares/bar.hex",
                          key_file="key.pem")
         pkg_name = os.path.join(self.work_directory, "mypackage.zip")
-        self.p.generate_package(pkg_name, preserve_work_directory=False)
+        self.p.generate_package(pkg_name, preserve_work_dir=False)
 
         unpacked_dir = os.path.join(self.work_directory, "unpacked")
         manifest = self.p.unpack_package(os.path.join(self.work_directory, pkg_name), unpacked_dir)
         self.assertIsNotNone(manifest)
-        self.assertEqual(u'bar.bin', manifest.softdevice.bin_file)
+        self.assertEqual('bar.bin', manifest.softdevice.bin_file)
 #         self.assertEqual(0, manifest.softdevice.init_packet_data.ext_packet_id)
 #         self.assertIsNotNone(manifest.softdevice.init_packet_data.firmware_crc16)
 
     def test_unpack_package_b(self):
-        self.p = Package(dev_type=1,
-                         dev_rev=2,
-                         app_version=100,
+        self.p = Package(app_version=100,
                          sd_req=[0x1000, 0xffff],
                          softdevice_fw="firmwares/bar.hex",
                          key_file="key.pem")
         pkg_name = os.path.join(self.work_directory, "mypackage.zip")
-        self.p.generate_package(pkg_name, preserve_work_directory=False)
+        self.p.generate_package(pkg_name, preserve_work_dir=False)
 
         unpacked_dir = os.path.join(self.work_directory, "unpacked")
         manifest = self.p.unpack_package(os.path.join(self.work_directory, pkg_name), unpacked_dir)
         self.assertIsNotNone(manifest)
-        self.assertEqual(u'bar.bin', manifest.softdevice.bin_file)
+        self.assertEqual('bar.bin', manifest.softdevice.bin_file)
 
     def test_unpack_package_c(self):
-        self.p = Package(dev_type=1,
-                         dev_rev=2,
-                         app_version=100,
+        self.p = Package(app_version=100,
                          sd_req=[0x1000, 0xffff],
                          softdevice_fw="firmwares/bar.hex",
                          key_file="key.pem")
         pkg_name = os.path.join(self.work_directory, "mypackage.zip")
-        self.p.generate_package(pkg_name, preserve_work_directory=False)
+        self.p.generate_package(pkg_name, preserve_work_dir=False)
 
         unpacked_dir = os.path.join(self.work_directory, "unpacked")
         manifest = self.p.unpack_package(os.path.join(self.work_directory, pkg_name), unpacked_dir)
         self.assertIsNotNone(manifest)
-        self.assertEqual(u'bar.bin', manifest.softdevice.bin_file)
+        self.assertEqual('bar.bin', manifest.softdevice.bin_file)
 
 
 if __name__ == '__main__':

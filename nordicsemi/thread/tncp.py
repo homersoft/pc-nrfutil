@@ -47,14 +47,16 @@ from spinel.stream import StreamOpen
 from spinel.codec import WpanApi
 from spinel.const import SPINEL
 import collections
+import spinel.util as util
 
 logger = logging.getLogger(__name__)
 
-class NCPTransport():
+class NCPTransport:
     '''A CoAP Toolkit compatible transport'''
     CFG_KEY_CHANNEL = 'channel'
     CFG_KEY_PANID = 'panid'
     CFG_KEY_RESET = 'reset'
+    CFG_KEY_MASTERKEY = 'masterkey'
 
     def __init__(self, port, stream_descriptor, config = None):
         self._port = port
@@ -76,7 +78,7 @@ class NCPTransport():
 
     @staticmethod
     def _propid_to_str(propid):
-        for name, value in SPINEL.__dict__.iteritems():
+        for name, value in SPINEL.__dict__.items():
             if (name.startswith('PROP_') and value == propid):
                 return name
 
@@ -98,8 +100,9 @@ class NCPTransport():
             (SPINEL.PROP_THREAD_RLOC16_DEBUG_PASSTHRU, 1, 'B'),
             (SPINEL.PROP_PHY_CHAN, self._config[self.CFG_KEY_CHANNEL], 'H'),
             (SPINEL.PROP_MAC_15_4_PANID, self._config[self.CFG_KEY_PANID], 'H'),
+            (SPINEL.PROP_NET_MASTER_KEY, self._config[self.CFG_KEY_MASTERKEY], '16s'),
             (SPINEL.PROP_NET_IF_UP, 1, 'B'),
-            (SPINEL.PROP_NET_STACK_UP, 2, 'B'),
+            (SPINEL.PROP_NET_STACK_UP, 1, 'B'),
         ]
         self._set_property(*props)
 
@@ -114,15 +117,13 @@ class NCPTransport():
 
     def _wpan_receive(self, prop, value, tid):
         consumed = False
-
         if prop == SPINEL.PROP_STREAM_NET:
             consumed = True
             try:
-                pkt = self._udp6_parser.parse(io.BytesIO(value[2:]),
+                pkt = self._udp6_parser.parse(io.BytesIO(value),
                                               spinel.common.MessageInfo())
-
                 endpoint = collections.namedtuple('endpoint', 'addr port')
-                payload = str(pkt.upper_layer_protocol.payload.to_bytes())
+                payload = pkt.upper_layer_protocol.payload.to_bytes()
                 src = endpoint(pkt.ipv6_header.source_address,
                                pkt.upper_layer_protocol.header.src_port)
                 dst = endpoint(pkt.ipv6_header.destination_address,
@@ -136,7 +137,7 @@ class NCPTransport():
             except Exception as e:
                 logging.exception(e)
         else:
-            logger.warn("Unexpected property received (PROP_ID: {})".format(prop))
+            logger.warning("Unexpected property received (PROP_ID: {})".format(prop))
 
         return consumed
 
@@ -148,9 +149,10 @@ class NCPTransport():
 
     @classmethod
     def get_default_config(cls):
-        return {cls.CFG_KEY_CHANNEL: 11,
-                cls.CFG_KEY_PANID:   0xabcd,
-                cls.CFG_KEY_RESET:   True}
+        return {cls.CFG_KEY_CHANNEL:     11,
+                cls.CFG_KEY_PANID:       0xabcd,
+                cls.CFG_KEY_RESET:       True,
+                cls.CFG_KEY_MASTERKEY:   util.hex_to_bytes("00112233445566778899aabbccddeeff")}
 
     def add_ip_address(self, ipaddr):
         valid = 1
@@ -158,7 +160,7 @@ class NCPTransport():
         flags = 0
         prefix_len = 64
 
-        prefix = ipaddress.IPv6Interface(unicode(ipaddr))
+        prefix = ipaddress.IPv6Interface(str(ipaddr))
         arr = prefix.ip.packed
         arr += self._wpan.encode_fields('CLLC',
                                            prefix_len,
@@ -172,13 +174,15 @@ class NCPTransport():
     def print_addresses(self):
         logger.info("NCP Thread IPv6 addresses:")
         for addr in self._wpan.get_ipaddrs():
-            logger.info(unicode(addr))
+            logger.info(str(addr))
 
     def send(self, payload, dest):
         if (dest.addr.is_multicast):
             rloc16 = self._wpan.prop_get_value(SPINEL.PROP_THREAD_RLOC16)
+
             # Create an IPv6 Thread RLOC address from mesh-local prefix and RLOC16 MAC address.
-            src_addr = ipaddress.ip_address(self._ml_prefix + '\x00\x00\x00\xff\xfe\x00' + struct.pack('>H', rloc16))
+            src_addr = ipaddress.ip_address(self._ml_prefix + b'\x00\x00\x00\xff\xfe\x00' + struct.pack('>H', rloc16))
+
         else:
             src_addr = self._ml_eid
 
@@ -195,10 +199,10 @@ class NCPTransport():
         except Exception as e:
             logging.exception(e)
 
-        self._wpan.ip_send(str(datagram.to_bytes()))
+        self._wpan.ip_send(datagram.to_bytes())
 
     def register_receiver(self, callback):
-        '''Registers a reciever, that will get all the data received from the transport.
+        '''Registers a receiver, that will get all the data received from the transport.
            The callback function shall be in format:
            receive_callback(src_addr, src_port, dest_port, dest_addr, payload)'''
         self._receivers.append(callback)

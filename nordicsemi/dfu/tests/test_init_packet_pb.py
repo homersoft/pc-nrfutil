@@ -35,8 +35,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 import unittest
-from nordicsemi.dfu.init_packet_pb import *
-from google.protobuf.message import EncodeError
+from nordicsemi.dfu.init_packet_pb import InitPacketPB, DFUType, SigningTypes, HashTypes
 import nordicsemi.dfu.dfu_cc_pb2 as pb
 
 HASH_BYTES_A = b'123123123123'
@@ -108,13 +107,6 @@ class TestPackage(unittest.TestCase):
     def test_init_packet(self):
         failed = False
         init_packet = InitPacketPB(hash_bytes=HASH_BYTES_A, hash_type=HASH_TYPE, dfu_type=DFU_TYPE, app_size=APP_SIZE)
-        try:
-            init_packet.get_init_packet_pb_bytes()
-        except EncodeError:
-            # Fails since we are missing signature
-            failed = True
-
-        self.assertTrue(failed)
 
         init_packet.set_signature(signature=SIGNATURE_BYTES_A, signature_type=SIGNATURE_TYPE)
         init_packet_serialized = init_packet.get_init_packet_pb_bytes()

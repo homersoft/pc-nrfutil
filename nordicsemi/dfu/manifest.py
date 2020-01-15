@@ -37,7 +37,6 @@
 
 # Python libraries
 import json
-import binascii
 import os
 
 # Nordic libraries
@@ -45,7 +44,7 @@ from pc_ble_driver_py.exceptions import NotImplementedException
 from nordicsemi.dfu.model import HexType, FirmwareKeys
 
 
-class ManifestGenerator(object):
+class ManifestGenerator:
     def __init__(self, firmwares_data):
         """
         The Manifest Generator constructor. Needs a data structure to generate a manifest from.
@@ -74,7 +73,7 @@ class ManifestGenerator(object):
             _firmware.bin_file = os.path.basename(firmware_dict[FirmwareKeys.BIN_FILENAME])
             _firmware.dat_file = os.path.basename(firmware_dict[FirmwareKeys.DAT_FILENAME])
 
-            if key == HexType.APPLICATION:
+            if key == HexType.APPLICATION or key == HexType.EXTERNAL_APPLICATION:
                 self.manifest.application = _firmware
             elif key == HexType.BOOTLOADER:
                 self.manifest.bootloader = _firmware
@@ -92,7 +91,7 @@ class ManifestGenerator(object):
             if not isinstance(d, dict):
                 return d
 
-            return dict((k, remove_none_entries(v)) for k, v in d.iteritems() if v is not None)
+            return dict((k, remove_none_entries(v)) for k, v in d.items() if v is not None)
 
         return json.dumps({'manifest': self.manifest},
                           default=lambda o: remove_none_entries(o.__dict__),
@@ -100,7 +99,7 @@ class ManifestGenerator(object):
                           separators=(',', ': '))
 
 
-class FWMetaData(object):
+class FWMetaData:
     def __init__(self,
                  is_debug=None,
                  hw_version=None,
@@ -128,7 +127,7 @@ class FWMetaData(object):
         self.bl_size = bl_size
 
 
-class Firmware(object):
+class Firmware:
     def __init__(self,
                  bin_file=None,
                  dat_file=None,
@@ -163,7 +162,7 @@ class SoftdeviceBootloaderFirmware(Firmware):
         :param int info_read_only_metadata: The metadata about this firwmare image
         :return: SoftdeviceBootloaderFirmware
         """
-        super(SoftdeviceBootloaderFirmware, self).__init__(
+        super().__init__(
             bin_file,
             dat_file,
             info_read_only_metadata)

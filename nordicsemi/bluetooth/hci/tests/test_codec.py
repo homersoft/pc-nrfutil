@@ -35,7 +35,6 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-import json
 import unittest
 from nordicsemi.bluetooth.hci.slip import Slip
 from nordicsemi.bluetooth.hci import codec
@@ -64,7 +63,7 @@ class TestInitPacket(unittest.TestCase):
 
         for uart_packet in read_packets:
             hex_string = uart_packet.replace(" ", "")
-            hex_data = hex_string.decode("hex")
+            hex_data = bytes.fromhex(hex_string)
             slip.append(hex_data)
 
         packets = slip.decode()

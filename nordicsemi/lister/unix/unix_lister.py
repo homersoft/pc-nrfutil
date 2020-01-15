@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2016 Nordic Semiconductor ASA
+# Copyright (c) 2019 Nordic Semiconductor ASA
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
@@ -35,39 +35,37 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-from Queue import Empty
-import logging
-import os
-import time
 import sys
+from nordicsemi.lister.lister_backend import AbstractLister
 
-from click.testing import CliRunner
-from behave import then, given, when
-
-from nordicsemi.__main__ import cli, int_as_text_to_int
-
-
-logger = logging.getLogger(__file__)
-
-STDOUT_TEXT_WAIT_TIME = 50  # Number of seconds to wait for expected output from stdout
+if 'linux' in sys.platform or sys.platform == 'darwin':
+    import serial.tools.list_ports
+    from nordicsemi.lister.enumerated_device import EnumeratedDevice
 
 
-@given(u'user types \'{command}\'')
-def step_impl(context, command):
-    args = command.split(' ')
-    assert args[0] == 'nrfutil'
-
-    exec_args = args[1:]
-
-    runner = CliRunner()
-    context.runner = runner
-    context.args = exec_args
+def create_id_string(sno, PID, VID):
+    return "{}-{}-{}".format(sno, PID, VID)
 
 
-@then(u'output contains \'{stdout_text}\' and exit code is {exit_code}')
-def step_impl(context, stdout_text, exit_code):
-    result = context.runner.invoke(cli, context.args)
-    logger.debug("exit_code: %s, output: \'%s\'", result.exit_code, result.output)
-    assert result.exit_code == int_as_text_to_int(exit_code)
-    assert result.output != None
-    assert result.output.find(stdout_text) >= 0
+class UnixLister(AbstractLister):
+
+    def enumerate(self):
+        device_identities = {}
+        available_ports = serial.tools.list_ports.comports()
+
+        for port in available_ports:
+            if port.pid is None or port.vid is None or port.serial_number is None:
+                continue
+
+            serial_number = port.serial_number
+            product_id = hex(port.pid).upper()[2:]
+            vendor_id = hex(port.vid).upper()[2:]
+            com_port = port.device
+
+            id = create_id_string(serial_number, product_id, vendor_id)
+            if id in device_identities:
+                device_identities[id].add_com_port(com_port)
+            else:
+                device_identities[id] = EnumeratedDevice(vendor_id, product_id, serial_number, [com_port])
+
+        return [device for device in list(device_identities.values())]

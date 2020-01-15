@@ -1,5 +1,4 @@
-#
-# Copyright (c) 2016 Nordic Semiconductor ASA
+# Copyright (c) 2016 - 2019 Nordic Semiconductor ASA
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
@@ -33,11 +32,10 @@
 # ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
 
-# Python specific imports
-import abc
 import logging
+
+from abc import ABC, abstractmethod
 
 # Nordic Semiconductor imports
 
@@ -54,7 +52,7 @@ class DfuEvent:
     PROGRESS_EVENT = 1
 
 
-class DfuTransport(object):
+class DfuTransport(ABC):
     """
     This class as an abstract base class inherited from when implementing transports.
 
@@ -62,7 +60,6 @@ class DfuTransport(object):
     than this class describes. But the intent is that the implementer shall follow the semantic as
     best as she can.
     """
-    __metaclass__ = abc.ABCMeta
 
     OP_CODE = {
         'CreateObject'          : 0x01,
@@ -93,7 +90,7 @@ class DfuTransport(object):
         "The format of the command was incorrect. This error code is not used in the current implementation, because @ref NRF_DFU_RES_CODE_OP_CODE_NOT_SUPPORTED and @ref NRF_DFU_RES_CODE_INVALID_PARAMETER cover all possible format errors.",
         "The command was successfully parsed, but it is not supported or unknown.",
         "The init command is invalid. The init packet either has an invalid update type or it is missing required fields for the update type (for example, the init packet for a SoftDevice update is missing the SoftDevice size field).",
-        "The firmware version is too low. For an application, the version must be greater than the current application. For a bootloader, it must be greater than or equal to the current version. This requirement prevents downgrade attacks.""",
+        "The firmware version is too low. For an application, the version must be greater than or equal to the current application. For a bootloader, it must be greater than the current version. This requirement prevents downgrade attacks.""",
         "The hardware version of the device does not match the required hardware version for the update.",
         "The array of supported SoftDevices for the update does not contain the FWID of the current SoftDevice.",
         "The init packet does not contain a signature, but this bootloader requires all updates to have one.",
@@ -105,12 +102,12 @@ class DfuTransport(object):
         "The requested firmware to update was already present on the system.",
     ]
 
-    @abc.abstractmethod
+    @abstractmethod
     def __init__(self):
         self.callbacks = {}
 
 
-    @abc.abstractmethod
+    @abstractmethod
     def open(self):
         """
         Open a port if appropriate for the transport.
@@ -119,7 +116,7 @@ class DfuTransport(object):
         pass
 
 
-    @abc.abstractmethod
+    @abstractmethod
     def close(self):
         """
         Close a port if appropriate for the transport.
@@ -127,7 +124,7 @@ class DfuTransport(object):
         """
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def send_init_packet(self, init_packet):
         """
         Send init_packet to device.
@@ -140,7 +137,7 @@ class DfuTransport(object):
         pass
 
 
-    @abc.abstractmethod
+    @abstractmethod
     def send_firmware(self, firmware):
         """
         Start sending firmware to device.
@@ -176,6 +173,6 @@ class DfuTransport(object):
         :param kwargs: Arguments to callback function
         :return:
         """
-        if event_type in self.callbacks.keys():
+        if event_type in list(self.callbacks.keys()):
             for callback in self.callbacks[event_type]:
                 callback(**kwargs)

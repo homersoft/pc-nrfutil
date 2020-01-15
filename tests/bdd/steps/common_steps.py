@@ -35,17 +35,17 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-from Queue import Queue
+from queue import Queue
 import logging
 import os
 import subprocess
 from threading import Thread
-from util import process_pipe, ON_POSIX
+from .util import process_pipe, ON_POSIX
 
 logger = logging.getLogger(__file__)
 
 
-class Exec(object):
+class Exec:
     def __init__(self, exec_path):
         self.path = exec_path
         self.name = os.path.basename(self.path)

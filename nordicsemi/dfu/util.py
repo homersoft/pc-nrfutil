@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 #
 # Copyright (c) 2016 Nordic Semiconductor ASA
 # All rights reserved.
@@ -42,15 +42,16 @@ from enum import Enum
 
 # From http://stackoverflow.com/questions/4472901/python-enum-class-with-tostring-fromstring
 class NordicEnum(Enum):
-  @classmethod
-  def tostring(cls, val):
-    for k,v in vars(cls).iteritems():
-        if v==val:
-            return k
+    @classmethod
+    def tostring(cls, val):
+        for k, v in vars(cls).items():
+            if v == val:
+                return k
 
-  @classmethod
-  def fromstring(cls, str):
-      return getattr(cls, str.upper(), None)
+    @classmethod
+    def fromstring(cls, str):
+        return getattr(cls, str.upper(), None)
+
 
 # TODO: Create query function that maps query-result strings with functions
 def query_func(question, default=False):
@@ -66,7 +67,7 @@ def query_func(question, default=False):
 
     while True:
         print("%s %s" % (question, prompt))
-        choice = raw_input().lower()
+        choice = input().lower()
         if choice == '':
             return default
         elif choice in valid:
