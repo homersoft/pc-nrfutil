@@ -43,6 +43,7 @@ import sys
 import click
 import time
 import logging
+import platform
 import re
 sys.path.append(os.getcwd())
 
@@ -561,6 +562,16 @@ def pkg():
               help='The private (signing) key in PEM format.',
               required=False,
               type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False))
+@click.option('--nonce-value',
+              help='The Nonce value in hex',
+              required=False,
+              type=click.STRING)
+@click.option('--external-fw',
+              help='External MCU firmware file',
+              type=click.STRING)
+@click.option('--app-data',
+              help='Application data for external MCU',
+              type=click.STRING)
 @click.option('--external-app',
               help='Indicates that the FW upgrade is intended to be passed through '
                    '(not applied on the receiving device)',
@@ -597,6 +608,9 @@ def pkg():
               help='The zigbee OTA maximum hw version of Zigbee OTA Client.',
               required=False,
               type=BASED_INT_OR_NONE)
+
+
+
 def generate(zipfile,
            debug_mode,
            application,
@@ -619,7 +633,10 @@ def generate(zipfile,
            zigbee_ota_hw_version,
            zigbee_ota_fw_version,
            zigbee_ota_min_hw_version,
-           zigbee_ota_max_hw_version):
+           zigbee_ota_max_hw_version,
+           nonce_value,
+           external_fw,
+           app_data):
     """
     Generate a zip package for distribution to apps that support Nordic DFU OTA.
     The application, bootloader, and SoftDevice files are converted to .bin if supplied as .hex files.
@@ -644,7 +661,41 @@ def generate(zipfile,
     """
     zipfile_path = zipfile
 
+    nonce_value_str = None
+    if nonce_value:
+        nonce_value_array = bytearray.fromhex(nonce_value)
+        nonce_value_str = str(nonce_value_array)
+
+        if len(nonce_value_str) != 12:
+            click.echo("Nonce given:" + nonce_value_str)
+            click.echo("Error: Invalid nonce length given: " + str(len(nonce_value_str)))
+            return
+
+    app_data_str = None
+    if app_data:
+        with open(app_data, "rb") as app_data_buff:
+            app_data_str = app_data_buff.read()
+            if len(app_data_str) > 32:
+                click.echo("Error: Too large application data file")
+                return
+
     # Check combinations
+    if external_fw is not None and (application is not None or bootloader is not None or softdevice is not None):
+        click.echo("Error: External fw package can't be generated with other types")
+        return
+
+    if application is not None and app_data is not None:
+        click.echo("Error: Provided application data for Silvair application")
+        return
+
+    if bootloader is not None and app_data is not None:
+        click.echo("Error: Provided application data for Silvair bootloader")
+        return
+
+    if external_fw is not None and nonce_value_str is not None:
+        click.echo("Error: Provided nonce for external MCU")
+        return
+
     if bootloader is not None and application is not None and softdevice is None:
         raise click.UsageError("Invalid combination: use two .zip packages instead.")
 
@@ -718,6 +769,10 @@ def generate(zipfile,
             # Use string as this will be mapped into an int below
             sd_req=str(Package.DEFAULT_SD_REQ[0])
 
+    if external_fw:
+        application_version_internal = 0
+        hw_version = 0
+        sd_req = "0x00"
     # Version checks
     if hw_version is None:
         raise click.UsageError("--hw-version required.")
@@ -725,7 +780,7 @@ def generate(zipfile,
     if sd_req is None and external_app is False:
         raise click.UsageError("--sd-req required.")
 
-    if application is not None and application_version_internal is None:
+    if application is not None and external_fw is not None and application_version_internal is None:
         raise click.UsageError('--application-version or --application-version-string'
                    ' required with application image.')
 
@@ -755,6 +810,7 @@ def generate(zipfile,
 
     if zigbee and zigbee_ota_fw_version is None:
         zigbee_ota_fw_version = 0
+
 
     sd_req_list = []
     if sd_req is not None:
@@ -855,7 +911,10 @@ def generate(zipfile,
                       zigbee_image_type,
                       zigbee_comment,
                       zigbee_ota_min_hw_version,
-                      zigbee_ota_max_hw_version)
+                      zigbee_ota_max_hw_version,
+                      nonce_value_str,
+                      external_fw,
+                      app_data_str)
 
     package.generate_package(zipfile_path)
 
@@ -1046,6 +1105,7 @@ def enumerate_ports():
     index = click.prompt('Enter your choice: ', type=click.IntRange(0, len(descs)))
     return descs[index].port
 
+
 def get_port_by_snr(snr):
     serial_ports = BLEDriver.enum_serial_ports()
     try:
@@ -1053,6 +1113,7 @@ def get_port_by_snr(snr):
     except IndexError:
         raise NordicSemiException('board not found')
     return serial_port
+
 
 @dfu.command(short_help="Update the firmware on a device over a BLE connection.")
 @click.option('-pkg', '--package',
@@ -1062,7 +1123,7 @@ def get_port_by_snr(snr):
 @click.option('-ic', '--conn-ic-id',
               help='Connectivity IC family: NRF51 or NRF52',
               type=click.Choice(['NRF51', 'NRF52']),
-              required=True)
+              required=False)
 @click.option('-p', '--port',
               help='Serial port COM port to which the connectivity IC is connected.',
               type=click.STRING)
@@ -1074,14 +1135,25 @@ def get_port_by_snr(snr):
               help='Device name.',
               type=click.STRING)
 @click.option('-a', '--address',
-              help='BLE address of the DFU target device.',
-              type=click.STRING)
+              help='BLE address of the DFU target device. There can be multiple addresses provided.',
+              type=click.STRING,
+              multiple=True)
 @click.option('-snr', '--jlink_snr',
               help='Jlink serial number for the connectivity IC.',
               type=click.STRING)
 @click.option('-f', '--flash_connectivity',
               help='Flash connectivity firmware automatically. Default: disabled.',
               type=click.BOOL,
+              is_flag=True)
+@click.option('-prn', '--packet_notification',
+              help='Use packet receipt notification mechanism. Default: 0 (disabled).',
+              type=click.INT,
+              required=False,
+              default=0)
+@click.option('-bz', '--bluez',
+              type=click.BOOL,
+              required=False,
+              default=False,
               is_flag=True)
 @click.option('-mtu', '--att-mtu',
               help='ATT MTU. Maximum ATT packet size for BLE transfers. '
@@ -1090,50 +1162,79 @@ def get_port_by_snr(snr):
                    'lower mtu.',
               type=click.IntRange(23, 247, clamp=True),
               default=247)
-def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity, att_mtu):
+def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity,
+        att_mtu, packet_notification, bluez):
     """
     Perform a Device Firmware Update on a device with a bootloader that supports BLE DFU.
     This requires a second nRF device, connected to this computer, with connectivity firmware
     loaded. The connectivity device will perform the DFU procedure onto the target device.
     """
-    ble_driver_init(conn_ic_id)
-    if name is None and address is None:
-        name = 'DfuTarg'
-        click.echo("No target selected. Default device name: {} is used.".format(name))
 
     # Remove colons from address in case written in format XX:XX:XX:XX:XX:XX
     if address:
-        address = address.replace(':', '')
-        if not re.match('^[0-9A-Fa-f]{12}$', address):
-            raise click.BadParameter('Must be exactly 6 bytes HEX, '
-                                     'e.g. ABCDEF123456 or AB:CD:EF:12:34:56.', param_hint='address')
+        address = [single_address.replace(':', '') for single_address in address]
+        for single_address in address:
+            if not re.match('^[0-9A-Fa-f]{12}$', single_address):
+                raise click.BadParameter('Must be exactly 6 bytes HEX, '
+                                         'e.g. ABCDEF123456 or AB:CD:EF:12:34:56.', param_hint='address')
 
-    if port is None and jlink_snr is not None:
-        port = get_port_by_snr(jlink_snr)
+    if bluez:
+        if platform.system().lower() != "linux":
+            logger.error("BlueZ is not support on platform: %s", platform.system().lower())
+            exit(1)
 
-    elif port is None:
-        port = enumerate_ports()
-        if port is None:
-            raise click.UsageError("\nNo Segger USB CDC ports found, please connect your board.")
+        ble_driver_init("NRF52")
+        if name is None and address is None:
+            name = 'DfuTarg'
+            click.echo("No target selected. Default device name: {} is used.".format(name))
 
-    if flash_connectivity:
-        flasher = Flasher(serial_port=port, snr = jlink_snr)
-        if flasher.fw_check():
-            click.echo("Board already flashed with connectivity firmware.")
-        else:
-            click.echo("Flashing connectivity firmware...")
-            flasher.fw_flash()
-            click.echo("Connectivity firmware flashed.")
-        flasher.reset()
-        time.sleep(1)
+        logger.info("Using transport: BlueZ.")
+        ble_backend = DfuTransportBle(serial_port=None,
+                                      target_device_name=None,
+                                      att_mtu=att_mtu,
+                                      target_device_addr=address,
+                                      prn=packet_notification,
+                                      bluez=True)
+        ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
+        dfu = Dfu(zip_file_path=package, dfu_transport=ble_backend, connect_delay=connect_delay)
 
-    logger.info("Using connectivity board at serial port: {}".format(port))
-    ble_backend = DfuTransportBle(serial_port=str(port),
-                                  att_mtu=att_mtu,
-                                  target_device_name=str(name),
-                                  target_device_addr=str(address))
-    ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
-    dfu = Dfu(zip_file_path = package, dfu_transport = ble_backend, connect_delay = connect_delay)
+    else:
+        if not conn_ic_id:
+            logger.error("Error: Missing option \"-ic\" / \"--conn-ic-id\".  Choose from NRF51, NRF52.")
+            return
+
+        ble_driver_init(conn_ic_id)
+        if name is None and address is None:
+            name = 'DfuTarg'
+            click.echo("No target selected. Default device name: {} is used.".format(name))
+
+        if port is None and jlink_snr is not None:
+            port = get_port_by_snr(jlink_snr)
+
+        elif port is None:
+            port = enumerate_ports()
+            if port is None:
+                raise click.UsageError("\nNo Segger USB CDC ports found, please connect your board.")
+
+        if flash_connectivity:
+            flasher = Flasher(serial_port=port, snr = jlink_snr)
+            if flasher.fw_check():
+                click.echo("Board already flashed with connectivity firmware.")
+            else:
+                click.echo("Flashing connectivity firmware...")
+                flasher.fw_flash()
+                click.echo("Connectivity firmware flashed.")
+            flasher.reset()
+            time.sleep(1)
+
+            logger.info("Using connectivity board at serial port: {}".format(port))
+            ble_backend = DfuTransportBle(serial_port=str(port),
+                                          att_mtu=att_mtu,
+                                          target_device_name=str(name),
+                                          target_device_addr=address,
+                                          prn=packet_notification)
+            ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
+            dfu = Dfu(zip_file_path=package, dfu_transport=ble_backend, connect_delay=connect_delay)
 
     if logger.getEffectiveLevel() > logging.INFO:
         with click.progressbar(length=dfu.dfu_get_total_size()) as bar:
@@ -1245,6 +1346,7 @@ def convert_version_string_to_int(s):
     js = [10000, 100, 1]
     return sum([js[i] * int(numbers[i]) for i in range(3)])
 
+
 @dfu.command(short_help="Update the firmware on a device over a Thread connection.")
 @click.option('-pkg', '--package',
               help='Filename of the DFU package.',
@@ -1290,6 +1392,7 @@ def convert_version_string_to_int(s):
 @click.option('-m', '--masterkey',
               help='Masterkey. If not specified then 00112233445566778899aabbccddeeff is used',
               type=click.STRING)
+
 
 def thread(package, port, address, server_port, panid, channel, jlink_snr, flash_connectivity,
            sim, rate, reset_suppress, masterkey):
@@ -1386,6 +1489,7 @@ def thread(package, port, address, server_port, panid, channel, jlink_snr, flash
     finally:
         transport.close()
 
+
 @dfu.command(short_help="Update the firmware on a device over a Zigbee connection.")
 @click.option('-f', '--file',
               help='Filename of the Zigbee OTA Upgrade file.',
@@ -1397,6 +1501,7 @@ def thread(package, port, address, server_port, panid, channel, jlink_snr, flash
 @click.option('-chan', '--channel',
               help='802.15.4 Channel that the OTA server will use',
               type=click.INT)
+
 
 def zigbee(file, jlink_snr, channel):
     """
@@ -1420,12 +1525,14 @@ def zigbee(file, jlink_snr, channel):
     of.randomize_eui64()
     of.setup_channel()
 
+
 @cli.group()
 def zigbee():
     """
     Zigbee-related commands and utilities.
     """
     pass
+
 
 @zigbee.command(short_help='Generate the Zigbee Production Config hex file.', name='production_config')
 @click.argument('input', required=True, type=click.Path())
@@ -1450,6 +1557,7 @@ def production_config(input, output, offset):
         click.echo("Production Config hexfile generated.")
     except ProductionConfigTooLargeException as e:
         raise click.UsageError("Production Config too large: " + str(e.length) + " bytes")
+
 
 if __name__ == '__main__':
     cli()

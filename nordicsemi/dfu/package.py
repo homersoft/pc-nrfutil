@@ -73,6 +73,7 @@ class PacketField(Enum):
     HW_VERSION = 2
     FW_VERSION = 3
     REQUIRED_SOFTDEVICES_ARRAY = 4
+    APP_DATA = 5
 
 class Package:
     """
@@ -133,8 +134,10 @@ class Package:
                  image_type=0,
                  comment='',
                  zigbee_ota_min_hw_version=None,
-                 zigbee_ota_max_hw_version=None):
-
+                 zigbee_ota_max_hw_version=None,
+                 nonce_value=None,
+                 external_fw=None,
+                 app_data=None):
         """
         Constructor that requires values used for generating a Nordic DFU package.
 
@@ -200,7 +203,19 @@ class Package:
                                      boot_validation_type=sd_boot_validation_type,
                                      init_packet_data=init_packet_vars)
 
+        if external_fw:
+            self.__add_firmware_info(firmware_type=HexType.EXTERNAL_APPLICATION,
+                                     firmware_version=app_version,
+                                     filename=external_fw,
+                                     init_packet_data=init_packet_vars)
+
         self.key_file = key_file
+
+        # if nonce_value:
+        self.nonce_value = nonce_value
+
+        # if app_data:
+        self.app_data = app_data
 
         self.work_dir = None
         self.manifest = None
@@ -409,8 +424,13 @@ DFU Package: <{0}>:
         for key, firmware_data in self.firmwares_data.items():
 
             # Normalize the firmware file and store it in the work directory
-            firmware_data[FirmwareKeys.BIN_FILENAME] = \
-                Package.normalize_firmware_to_bin(self.work_dir, firmware_data[FirmwareKeys.FIRMWARE_FILENAME])
+            if key == HexType.EXTERNAL_APPLICATION:
+                firmware_data[FirmwareKeys.BIN_FILENAME] = \
+                    Package.normalize_firmware_to_bin(self.work_dir, firmware_data[FirmwareKeys.FIRMWARE_FILENAME],
+                                                      fixed_start_addr=True)
+            else:
+                firmware_data[FirmwareKeys.BIN_FILENAME] = \
+                    Package.normalize_firmware_to_bin(self.work_dir, firmware_data[FirmwareKeys.FIRMWARE_FILENAME])
 
             # Calculate the hash for the .bin file located in the work directory
             bin_file_path = os.path.join(self.work_dir, firmware_data[FirmwareKeys.BIN_FILENAME])
@@ -429,6 +449,8 @@ DFU Package: <{0}>:
             elif key == HexType.SD_BL:
                 bl_size = firmware_data[FirmwareKeys.BL_SIZE]
                 sd_size = firmware_data[FirmwareKeys.SD_SIZE]
+            elif key == HexType.EXTERNAL_APPLICATION:
+                app_size = bin_length
 
             boot_validation_type_array = firmware_data[FirmwareKeys.BOOT_VALIDATION_TYPE]
             boot_validation_bytes_array = []
@@ -455,7 +477,9 @@ DFU Package: <{0}>:
                             sd_size=sd_size,
                             app_size=app_size,
                             bl_size=bl_size,
-                            sd_req=firmware_data[FirmwareKeys.INIT_PACKET_DATA][PacketField.REQUIRED_SOFTDEVICES_ARRAY])
+                            sd_req=firmware_data[FirmwareKeys.INIT_PACKET_DATA][PacketField.REQUIRED_SOFTDEVICES_ARRAY],
+                            nonce_val=self.nonce_value,
+                            app_data=self.app_data)
 
             if (self.key_file is not None):
                 signer = Signing()
@@ -604,14 +628,14 @@ DFU Package: <{0}>:
             self.firmwares_data[firmware_type][FirmwareKeys.INIT_PACKET_DATA][PacketField.FW_VERSION] = firmware_version
 
     @staticmethod
-    def normalize_firmware_to_bin(work_dir, firmware_path):
+    def normalize_firmware_to_bin(work_dir, firmware_path, fixed_start_addr=False):
         firmware_filename = os.path.basename(firmware_path)
         new_filename = firmware_filename.replace(".hex", ".bin")
         new_filepath = os.path.join(work_dir, new_filename)
 
         if not os.path.exists(new_filepath):
             temp = nRFHex(firmware_path)
-            temp.tobinfile(new_filepath)
+            temp.tobinfile(new_filepath, fixed_start_addr=fixed_start_addr)
 
         return new_filepath
 

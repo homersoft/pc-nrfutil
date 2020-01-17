@@ -51,7 +51,7 @@ from pc_ble_driver_py.ble_driver    import ATT_MTU_DEFAULT, BLEConfig, BLEConfig
 from pc_ble_driver_py.ble_adapter   import BLEAdapter, BLEAdapterObserver, EvtSync
 
 logger  = logging.getLogger(__name__)
-#logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)
 
 from pc_ble_driver_py import config
 global nrf_sd_ble_api_ver
@@ -138,15 +138,15 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.adapter.driver.observer_unregister(self)
         self.adapter.driver.close()
 
-    def connect(self, target_device_name, target_device_addr):
+    def connect(self, target_device_name, target_device_addr_list):
         """ Connect to Bootloader or Application with Buttonless Service.
 
         Args:
             target_device_name (str): Device name to scan for.
-            target_device_addr (str): Device addr to scan for.
+            target_device_addr_list List[str]: Device addresses to scan for.
         """
         self.target_device_name = target_device_name
-        self.target_device_addr = target_device_addr
+        self.target_device_addr_list = target_device_addr_list
 
         logger.info('BLE: Scanning for {}'.format(self.target_device_name))
         self.adapter.driver.ble_gap_scan_start()
@@ -237,7 +237,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
             True if connected, else False.
 
         """
-        self.conn_handle = self.evt_sync.wait('connected')
+        self.conn_handle = self.evt_sync.wait('connected', timeout=30)
         if self.conn_handle is not None:
             retries = DFUAdapter.CONNECTION_ATTEMPTS
             while retries:
@@ -382,7 +382,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         address_string  = "".join("{0:02X}".format(b) for b in peer_addr.addr)
         logger.info('Received advertisement report, address: 0x{}, device_name: {}'.format(address_string, dev_name))
 
-        if (dev_name == self.target_device_name) or (address_string == self.target_device_addr):
+        if (dev_name == self.target_device_name) or (address_string in self.target_device_addr_list):
             self.conn_params = BLEGapConnParams(min_conn_interval_ms = 7.5,
                                                 max_conn_interval_ms = 30,
                                                 conn_sup_timeout_ms  = 4000,
@@ -393,8 +393,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
             # set with BLEConfigConnGatt (that implicitly operates
             # on connections with tag 1) to allow for larger MTU.
             self.adapter.connect(address=peer_addr,
-                                 conn_params=self.conn_params,
-                                 tag=1)
+                                 conn_params=self.conn_params)
             # store the address for subsequent connections
             self.target_device_addr = address_string
             self.target_device_addr_type = peer_addr
@@ -447,16 +446,20 @@ class DfuTransportBle(DfuTransport):
                  target_device_name=None,
                  target_device_addr=None,
                  baud_rate=1000000,
-                 prn=0):
+                 prn=0,
+                 bluez=False):
+
         super().__init__()
         DFUAdapter.LOCAL_ATT_MTU = att_mtu
         self.baud_rate          = baud_rate
         self.serial_port        = serial_port
         self.att_mtu            = att_mtu
         self.target_device_name = target_device_name
-        self.target_device_addr = target_device_addr
+        self.target_device_addr_list = target_device_addr
+        self.target_device_addr = None
         self.dfu_adapter        = None
         self.prn                = prn
+        self.bluez              = bluez
 
         self.bonded             = False
         self.keyset             = None
@@ -466,14 +469,18 @@ class DfuTransportBle(DfuTransport):
             raise IllegalStateException('DFU Adapter is already open')
 
         super().open()
-        driver           = DfuBLEDriver(serial_port = self.serial_port,
-                                        baud_rate   = self.baud_rate)
-        adapter          = BLEAdapter(driver)
+
+        if self.bluez:
+            from nordicsemi.dfu.bluez import BluezBleAdapter
+            adapter = BluezBleAdapter()
+        else:
+            driver  = DfuBLEDriver(serial_port = self.serial_port, baud_rate   = self.baud_rate)
+            adapter = BLEAdapter(driver)
         self.dfu_adapter = DFUAdapter(adapter=adapter, bonded=self.bonded, keyset=self.keyset)
         self.dfu_adapter.open()
         self.target_device_name, self.target_device_addr = self.dfu_adapter.connect(
                                                         target_device_name = self.target_device_name,
-                                                        target_device_addr = self.target_device_addr)
+                                                        target_device_addr_list = self.target_device_addr_list)
         self.__set_prn()
 
     def close(self):
@@ -562,6 +569,7 @@ class DfuTransportBle(DfuTransport):
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=response['offset'])
 
         response = self.__select_data()
+        response['crc'] = 0
         try_to_recover()
 
         for i in range(response['offset'], len(firmware), response['max_size']):

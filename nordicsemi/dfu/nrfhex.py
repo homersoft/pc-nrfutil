@@ -136,20 +136,23 @@ class nRFHex(intelhex.IntelHex):
 
         return min_address
 
-    def size(self):
+    def size(self, fixed_start_addr=False):
         """
         Returns the size of the source.
         :return: int
         """
         min_address = self.minaddr()
+        if fixed_start_addr:
+            min_address = min(self.addresses())
         max_address = self.maxaddr()
 
         size = max_address - min_address + 1
 
         # Round up to nearest word
-        word_size = 4
-        number_of_words = (size + (word_size - 1)) // word_size
-        size = number_of_words * word_size
+        if not fixed_start_addr:
+            word_size = 4
+            number_of_words = (size + (word_size - 1)) // word_size
+            size = number_of_words * word_size
 
         return size
 
@@ -163,7 +166,7 @@ class nRFHex(intelhex.IntelHex):
 
         return self.bootloaderhex.size()
 
-    def tobinfile(self, fobj, start=None, end=None, pad=None, size=None):
+    def tobinfile(self, fobj, start=None, end=None, pad=None, size=None, fixed_start_addr=False):
         """
         Writes a binary version of source and bootloader respectively to fobj which could be a
         file object or a file path.
@@ -178,8 +181,13 @@ class nRFHex(intelhex.IntelHex):
         else:
             close_fd = False
 
-        start_address = self.minaddr()
-        size = self.size()
+        if fixed_start_addr:
+            start_address = min(self.addresses())
+            size = self.size(fixed_start_addr=fixed_start_addr)
+        else:
+            start_address = self.minaddr()
+            size = self.size()
+
         super().tobinfile(fobj, start=start_address, size=size)
 
         if self.bootloaderhex is not None:

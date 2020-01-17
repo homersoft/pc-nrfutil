@@ -81,6 +81,8 @@ class ManifestGenerator:
                 self.manifest.softdevice = _firmware
             elif key == HexType.SD_BL:
                 self.manifest.softdevice_bootloader = _firmware
+            elif key == HexType.EXTERNAL_APPLICATION:
+                self.manifest.application = _firmware
             else:
                 raise NotImplementedException("Support for firmware type {0} not implemented yet.".format(key))
 

@@ -1,6 +1,7 @@
 antlib >= 1.1b0; sys_platform == 'win32'
 click
 crcmod
+dbus-python
 ecdsa
 intelhex
 libusb1
@@ -11,3 +12,6 @@ pyserial
 pyspinel >= 1.0.0a3
 pyyaml
 tqdm
+
+gobject
+PyGObject
