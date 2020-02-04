@@ -1164,6 +1164,12 @@ def get_port_by_snr(snr):
               default=247)
 def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity,
         att_mtu, packet_notification, bluez):
+    _ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity,
+        att_mtu, packet_notification, bluez)
+
+
+def _ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity,
+        att_mtu, packet_notification, bluez):
     """
     Perform a Device Firmware Update on a device with a bootloader that supports BLE DFU.
     This requires a second nRF device, connected to this computer, with connectivity firmware
