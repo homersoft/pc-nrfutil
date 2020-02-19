@@ -17,14 +17,4 @@ pipelinePythonSCA(
     installFromSetup: true,
     runPipCheck: true,
     runUnitTests: false,
-    packages: [
-            ".",
-            "modulo/packages/slip_framer",
-            "modulo/packages/ble_communication",
-            "modulo/packages/fw_communication",
-            "modulo/packages/labjack_handler",
-            "modulo/packages/mesh_spec",
-            "modulo/packages/ssh_communication",
-            "modulo/packages/yocto_light_sensor"
-    ]
 )
