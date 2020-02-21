@@ -148,7 +148,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.target_device_name = target_device_name
         self.target_device_addr_list = target_device_addr_list
 
-        logger.info('BLE: Scanning for {}'.format(self.target_device_name))
+        logger.info('BLE: Scanning for {}'.format(self.target_device_addr_list))
         self.adapter.driver.ble_gap_scan_start()
         self.verify_stable_connection()
         if self.conn_handle is None:
