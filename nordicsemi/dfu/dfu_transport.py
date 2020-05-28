@@ -71,17 +71,18 @@ class DfuTransport(ABC):
     }
 
     RES_CODE = {
-        'InvalidCode'           : 0x00,
-        'Success'               : 0x01,
-        'NotSupported'          : 0x02,
-        'InvalidParameter'      : 0x03,
-        'InsufficientResources' : 0x04,
-        'InvalidObject'         : 0x05,
-        'InvalidSignature'      : 0x06,
-        'UnsupportedType'       : 0x07,
-        'OperationNotPermitted' : 0x08,
-        'OperationFailed'       : 0x0A,
-        'ExtendedError'         : 0x0B,
+        'InvalidCode'             : 0x00,
+        'Success'                 : 0x01,
+        'NotSupported'            : 0x02,
+        'InvalidParameter'        : 0x03,
+        'InsufficientResources'   : 0x04,
+        'InvalidObject'           : 0x05,
+        'InvalidSignature'        : 0x06,
+        'UnsupportedType'         : 0x07,
+        'OperationNotPermitted'   : 0x08,
+        'OperationFailed'         : 0x0A,
+        'ExtendedError'           : 0x0B,
+        'FirmwareAlreadyUpToDate' : 0x80,
     }
 
     EXT_ERROR_CODE = [
