@@ -581,7 +581,7 @@ class DfuTransportBle(DfuTransport):
                     self.__execute()
                     break
                 except ValidationException:
-                    pass
+                    logger.critical(f"ValidationException occurred during firmware send at attempt {r + 1}. Retrying.")
             else:
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
