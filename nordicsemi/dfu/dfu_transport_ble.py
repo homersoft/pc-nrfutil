@@ -579,9 +579,9 @@ class DfuTransportBle(DfuTransport):
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
                     self.__execute()
+                    break
                 except ValidationException:
                     pass
-                break
             else:
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
