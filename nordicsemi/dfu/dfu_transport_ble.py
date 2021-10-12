@@ -238,8 +238,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
 
         """
         logger.info("Checking connection stability")
-        retries = DFUAdapter.CONNECTION_ATTEMPTS
-        while retries:
+        for _ in range(DFUAdapter.CONNECTION_ATTEMPTS):
             self.conn_handle = self.evt_sync.wait('connected', timeout=30)
             if self.conn_handle is None:
                 logger.warning("Could not connect. Restarting adapter")
@@ -247,8 +246,8 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
                 self.adapter.driver.ble_gap_scan_start()
             else:
                 if self.evt_sync.wait('disconnected', timeout=1) is not None:
-                    logger.warning("Received unexpected disconnect event, "
-                                   "trying to re-connect to: {}".format(self.target_device_addr))
+                    logger.warning(f"Received unexpected disconnect event, "
+                                   f"trying to re-connect to: {self.target_device_addr}")
                     time.sleep(1)
                     self.adapter.connect(address=self.target_device_addr_type,
                                          conn_params=self.conn_params)
@@ -256,8 +255,6 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
 
                 logger.info("Connection successful")
                 return
-
-            retries -= 1
 
         self.adapter.driver.ble_gap_scan_stop()
         raise Exception("Connection Failure - Device not found!")
