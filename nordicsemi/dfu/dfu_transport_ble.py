@@ -231,33 +231,33 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
 
     def verify_stable_connection(self):
         """ Verify connection event, and verify that unexpected disconnect
-         events are not received.
+         events are not received. Reconnect if necessary.
 
         Returns:
             True if connected, else False.
 
         """
-        self.conn_handle = self.evt_sync.wait('connected', timeout=30)
-        if self.conn_handle is not None:
-            retries = DFUAdapter.CONNECTION_ATTEMPTS
-            while retries:
-                if self.evt_sync.wait('disconnected', timeout=1) is None:
-                    break
-
-                logger.warning("Received unexpected disconnect event, "
-                               "trying to re-connect to: {}".format(self.target_device_addr))
-                time.sleep(1)
-
-                self.adapter.connect(address=self.target_device_addr_type,
-                                     conn_params=self.conn_params)
-                self.conn_handle = self.evt_sync.wait('connected')
-                retries -= 1
+        logger.info("Checking connection stability")
+        retries = DFUAdapter.CONNECTION_ATTEMPTS
+        while retries:
+            self.conn_handle = self.evt_sync.wait('connected', timeout=30)
+            if self.conn_handle is None:
+                logger.warning("Could not connect. Restarting adapter")
+                self.adapter.driver.ble_gap_scan_stop()
+                self.adapter.driver.ble_gap_scan_start()
             else:
                 if self.evt_sync.wait('disconnected', timeout=1) is not None:
-                    raise Exception("Failure - Connection failed due to 0x3e")
+                    logger.warning("Received unexpected disconnect event, "
+                                   "trying to re-connect to: {}".format(self.target_device_addr))
+                    time.sleep(1)
+                    self.adapter.connect(address=self.target_device_addr_type,
+                                         conn_params=self.conn_params)
+                    return
 
-            logger.info("Successfully Connected")
-            return
+                logger.info("Connection successful")
+                return
+
+            retries -= 1
 
         self.adapter.driver.ble_gap_scan_stop()
         raise Exception("Connection Failure - Device not found!")
