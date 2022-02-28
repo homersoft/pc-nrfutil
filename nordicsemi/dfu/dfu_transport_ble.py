@@ -530,7 +530,7 @@ class DfuTransportBle(DfuTransport):
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
                 self.__execute()
-            except (NordicSemiException, ValidationException) as error:
+            except ValidationException as error:
                 logger.critical(f"BLE: Error occurred during init packet send at attempt {r + 1}: {error}")
                 continue
             break
@@ -580,7 +580,7 @@ class DfuTransportBle(DfuTransport):
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
                     self.__execute()
-                except (NordicSemiException, ValidationException) as error:
+                except ValidationException as error:
                     logger.critical(f"BLE: Error occurred during firmware send at attempt {r + 1}: {error}")
                     continue
                 break
