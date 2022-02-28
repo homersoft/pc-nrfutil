@@ -581,8 +581,15 @@ class DfuTransportBle(DfuTransport):
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
                     self.__execute()
                 except ValidationException as error:
-                    logger.critical(f"BLE: Error occurred during firmware send at attempt {r + 1}: {error}")
+                    logger.critical(f"BLE: ValidationException Error occurred during firmware send at "
+                                    f"attempt {r + 1}: {error}")
                     continue
+                except NordicSemiException as error:
+                    if "Timeout: operation - CalcChecSum" in error.msg:
+                        logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
+                                        f"attempt {r + 1}: {error}")
+                        continue
+                    raise
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
