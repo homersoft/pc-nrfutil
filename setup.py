@@ -136,7 +136,7 @@ class NoseTestCommand(TestCommand):
 
 setup(
     name="nrfutil-bluez",
-    version="6.0.3.dev5rec",
+    version="6.0.3.dev6",
     license="Modified BSD License",
     author="Nordic Semiconductor ASA",
     url="https://github.com/NordicSemiconductor/pc-nrfutil",
