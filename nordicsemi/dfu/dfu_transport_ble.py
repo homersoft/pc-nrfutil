@@ -244,8 +244,8 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
                 if self.evt_sync.wait('disconnected', timeout=1) is None:
                     break
 
-                logger.warning("Received unexpected disconnect event, "
-                               "trying to re-connect to: {}".format(self.target_device_addr))
+                logger.critical("[verify_stable_connection] Received unexpected disconnect event, "
+                                "trying to re-connect to: {}".format(self.target_device_addr))
                 time.sleep(1)
 
                 self.adapter.connect(address=self.target_device_addr_type,
@@ -256,7 +256,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
                 if self.evt_sync.wait('disconnected', timeout=1) is not None:
                     raise Exception("Failure - Connection failed due to 0x3e")
 
-            logger.info("Successfully Connected")
+            logger.critical("[verify_stable_connection] Successfully Connected")
             return
 
         self.adapter.driver.ble_gap_scan_stop()
@@ -587,7 +587,8 @@ class DfuTransportBle(DfuTransport):
                 except NordicSemiException as error:
                     if "Timeout: operation - CalcChecSum" in error.msg:
                         logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
-                                        f"attempt {r + 1}: {error}")
+                                        f"attempt {r + 1}. Trying to reconnect")
+                        self.dfu_adapter.verify_stable_connection()
                         continue
                     raise
                 break
