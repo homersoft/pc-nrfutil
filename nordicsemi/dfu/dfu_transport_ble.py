@@ -589,7 +589,9 @@ class DfuTransportBle(DfuTransport):
                     if "Timeout: operation - CalcChecSum" in error.msg:
                         logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
                                         f"attempt {r + 1}. Trying to reconnect")
-                        self.dfu_adapter.verify_stable_connection()
+                        #self.dfu_adapter.verify_stable_connection()
+                        self.adapter.connect(address=self.target_device_addr_type, conn_params=self.conn_params)
+                        self.conn_handle = self.evt_sync.wait('connected')
                         continue
                     raise
                 break
