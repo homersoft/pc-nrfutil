@@ -576,6 +576,7 @@ class DfuTransportBle(DfuTransport):
         for i in range(response['offset'], len(firmware), response['max_size']):
             data = firmware[i:i+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
+                logger.critical(f" Retry number : {r}")
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
@@ -597,6 +598,7 @@ class DfuTransportBle(DfuTransport):
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
+            logger.debug("sending firmware:")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
 
     def __set_prn(self):
