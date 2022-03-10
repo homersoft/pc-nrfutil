@@ -585,6 +585,7 @@ class DfuTransportBle(DfuTransport):
                                     f"attempt {r + 1}: {error}")
                     continue
                 except NordicSemiException as error:
+                    logger.critical(f" NordicSemiException error: {error}")
                     if "Timeout: operation - CalcChecSum" in error.msg:
                         logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
                                         f"attempt {r + 1}. Trying to reconnect")
