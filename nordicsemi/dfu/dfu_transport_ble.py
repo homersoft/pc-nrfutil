@@ -576,7 +576,7 @@ class DfuTransportBle(DfuTransport):
         for i in range(response['offset'], len(firmware), response['max_size']):
             data = firmware[i:i+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
-                logger.critical(f" Retry number : {r}")
+                logger.debug(f" Retry number : {r}")
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
@@ -590,15 +590,17 @@ class DfuTransportBle(DfuTransport):
                     if "Timeout: operation - CalcChecSum" in error.msg:
                         logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
                                         f"attempt {r + 1}. Trying to reconnect")
+                        self.close()
+                        self.open()
                         #self.dfu_adapter.verify_stable_connection()
-                        self.adapter.connect(address=self.target_device_addr_type, conn_params=self.conn_params)
-                        self.conn_handle = self.evt_sync.wait('connected')
                         continue
                     raise
+                except Exception as error:
+                    logger.critical(f" Different exception error: {error}")
+                    continue
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
-            logger.debug("sending firmware:")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
 
     def __set_prn(self):
