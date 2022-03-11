@@ -597,7 +597,7 @@ class DfuTransportBle(DfuTransport):
                     raise
                 except Exception as error:
                     logger.critical(f"Different exception error: {error}")
-                    logger.critical('type is:', error.__class__.__name__)
+                    logger.critical(f"type is: {error.__class__.__name__}")
                     self.close()
                     logger.critical("Connection closed")
                     self.open()
@@ -607,7 +607,7 @@ class DfuTransportBle(DfuTransport):
             else:
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
-            logger.event("Event sent")
+            logger.debug("Event sent")
 
     def __set_prn(self):
         logger.debug("BLE: Set Packet Receipt Notification {}".format(self.prn))
