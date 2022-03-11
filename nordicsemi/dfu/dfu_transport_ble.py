@@ -587,6 +587,7 @@ class DfuTransportBle(DfuTransport):
                 except ValidationException as error:
                     logger.critical(f"BLE: ValidationException Error occurred during firmware send at "
                                     f"attempt {r + 1}: {error}")
+                    try_to_recover()
                     continue
                 except NordicSemiException as error:
                     logger.critical(f" NordicSemiException error: {error}")
@@ -594,8 +595,9 @@ class DfuTransportBle(DfuTransport):
                         logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
                                         f"attempt {r + 1}. Trying to reconnect")
                         self.close()
+                        logger.critical("Connection closed")
                         self.open()
-                        try_to_recover()
+                        logger.critical("Connection opened")
                         #self.dfu_adapter.verify_stable_connection()
                         continue
                     raise
