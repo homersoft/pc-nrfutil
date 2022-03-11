@@ -542,6 +542,7 @@ class DfuTransportBle(DfuTransport):
             logger.debug("trying to recover")
             if response['offset'] == 0:
                 # Nothing to recover
+                logger.debug(f"trying to recover, CRC: {response['crc']}")
                 return
 
             expected_crc = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
@@ -551,6 +552,7 @@ class DfuTransportBle(DfuTransport):
                 # Invalid CRC. Remove corrupted data.
                 response['offset'] -= remainder if remainder != 0 else response['max_size']
                 response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
+                logger.debug(f"trying to recover, CRC: {response['crc']}")
                 return
 
             if (remainder != 0) and (response['offset'] != len(firmware)):
@@ -565,14 +567,14 @@ class DfuTransportBle(DfuTransport):
                     # Remove corrupted data.
                     response['offset'] -= remainder
                     response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
+                    logger.debug(f"trying to recover, CRC: {response['crc']}")
                     return
-            logger.debug(f"trying to recover, CRC: {response['crc']}")
-
-
+            logger.debug("trying to recover, exit")
             self.__execute()
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=response['offset'])
 
         response = self.__select_data()
+        logger.debug(f"selected_data, CRC: {response['crc']}")
         response['crc'] = 0
         try_to_recover()
 
@@ -587,7 +589,6 @@ class DfuTransportBle(DfuTransport):
                 except ValidationException as error:
                     logger.critical(f"BLE: ValidationException Error occurred during firmware send at "
                                     f"attempt {r + 1}: {error}")
-                    try_to_recover()
                     continue
                 except NordicSemiException as error:
                     logger.critical(f" NordicSemiException error: {error}")
@@ -598,6 +599,8 @@ class DfuTransportBle(DfuTransport):
                         logger.critical("Connection closed")
                         self.open()
                         logger.critical("Connection opened")
+                        response['crc'] = 0
+                        try_to_recover()
                         #self.dfu_adapter.verify_stable_connection()
                         continue
                     raise
