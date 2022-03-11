@@ -539,6 +539,7 @@ class DfuTransportBle(DfuTransport):
 
     def send_firmware(self, firmware):
         def try_to_recover():
+            logger.debug("trying to recover")
             if response['offset'] == 0:
                 # Nothing to recover
                 return
@@ -565,6 +566,8 @@ class DfuTransportBle(DfuTransport):
                     response['offset'] -= remainder
                     response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
                     return
+            logger.debug(f"trying to recover, CRC: {response['crc']}")
+
 
             self.__execute()
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=response['offset'])
@@ -592,6 +595,7 @@ class DfuTransportBle(DfuTransport):
                                         f"attempt {r + 1}. Trying to reconnect")
                         self.close()
                         self.open()
+                        try_to_recover()
                         #self.dfu_adapter.verify_stable_connection()
                         continue
                     raise
