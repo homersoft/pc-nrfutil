@@ -581,7 +581,7 @@ class DfuTransportBle(DfuTransport):
         response['crc'] = 0
         try_to_recover()
         for i in range(response['offset'], len(firmware), response['max_size']):
-            logger.debug(f"offset : {response['offset']}")
+            logger.critical(f"offset : {response['offset']}")
             data = firmware[i:i+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
                 logger.debug(f" Retry number : {r}")
@@ -609,24 +609,24 @@ class DfuTransportBle(DfuTransport):
                         try_to_recover()
                         break
                     raise
-                except DBusException as error:
-                    logger.critical(f" DBusException error: {error}")
-                    self.close()
-                    logger.critical("Connection closed")
-                    self.open()
-                    logger.critical("Connection opened")
-                    response = self.__select_data()
-                    #response = self.__calculate_checksum()
-                    try_to_recover()
-                    continue
-                except Exception as error:
-                    logger.critical(f"Different exception error: {error}")
-                    logger.critical(f"type is: {error.__class__.__name__}")
-                    self.close()
-                    logger.critical("Connection closed")
-                    self.open()
-                    logger.critical("Connection opened")
-                    continue
+                # except DBusException as error:
+                #     logger.critical(f" DBusException error: {error}")
+                #     self.close()
+                #     logger.critical("Connection closed")
+                #     self.open()
+                #     logger.critical("Connection opened")
+                #     response = self.__select_data()
+                #     #response = self.__calculate_checksum()
+                #     try_to_recover()
+                #     continue
+                # except Exception as error:
+                #     logger.critical(f"Different exception error: {error}")
+                #     logger.critical(f"type is: {error.__class__.__name__}")
+                #     self.close()
+                #     logger.critical("Connection closed")
+                #     self.open()
+                #     logger.critical("Connection opened")
+                #     continue
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
