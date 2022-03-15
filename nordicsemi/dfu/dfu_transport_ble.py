@@ -541,7 +541,6 @@ class DfuTransportBle(DfuTransport):
 
     def send_firmware(self, firmware):
         def try_to_recover():
-            logger.debug("trying to recover")
             if response['offset'] == 0:
                 # Nothing to recover
                 logger.debug(f"trying to recover, offset==0 CRC: {response['crc']}")
@@ -580,11 +579,11 @@ class DfuTransportBle(DfuTransport):
         logger.debug(f"selected_data, CRC: {response['crc']}")
         response['crc'] = 0
         try_to_recover()
+
         for i in range(response['offset'], len(firmware), response['max_size']):
             logger.critical(f"chunk {i}, offset : {response['offset']}")
             data = firmware[i:i+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
-                logger.debug(f" Retry number : {r}")
                 try:
                     self.__create_data(len(data))
                     logger.debug(f"stream_data, crc: {response['crc']}")
@@ -602,10 +601,8 @@ class DfuTransportBle(DfuTransport):
                         logger.critical(f"BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
                                         f"attempt {r + 1}. Trying to reconnect")
                         self.close()
-                        logger.critical("Connection closed")
                         self.open()
-                        logger.critical("Connection opened")
-                        #response = self.__select_data()
+                        response = self.__select_data()
                         try_to_recover()
                         break
                     raise
