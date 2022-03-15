@@ -543,7 +543,7 @@ class DfuTransportBle(DfuTransport):
         def try_to_recover():
             if response['offset'] == 0:
                 # Nothing to recover
-                logger.debug(f"trying to recover, offset==0 CRC: {response['crc']}")
+                logger.critical(f"trying to recover, offset==0 CRC: {response['crc']}")
                 return
 
             expected_crc = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
@@ -553,7 +553,7 @@ class DfuTransportBle(DfuTransport):
                 # Invalid CRC. Remove corrupted data.
                 response['offset'] -= remainder if remainder != 0 else response['max_size']
                 response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
-                logger.debug(f"trying to recover, different crc CRC: {response['crc']}")
+                logger.critical(f"trying to recover, different crc CRC: {response['crc']}")
                 return
 
             if (remainder != 0) and (response['offset'] != len(firmware)):
@@ -564,14 +564,14 @@ class DfuTransportBle(DfuTransport):
                                                              crc    = response['crc'],
                                                              offset = response['offset'])
                     response['offset'] += len(to_send)
-                    logger.debug(f"sending rest of data, validationexception, CRC: {response['crc']}")
+                    logger.critical(f"sending rest of data, validationexception, CRC: {response['crc']}")
                 except ValidationException:
                     # Remove corrupted data.
                     response['offset'] -= remainder
                     response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
-                    logger.debug(f"trying to recover, validationexception, CRC: {response['crc']}")
+                    logger.critical(f"trying to recover, validationexception, CRC: {response['crc']}")
                     return
-            logger.debug("trying to recover, pass, exit")
+            logger.critical("trying to recover, pass, exit")
             self.__execute()
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=response['offset'])
 
@@ -698,7 +698,7 @@ class DfuTransportBle(DfuTransport):
             if self.prn == current_pnr:
                 current_pnr = 0
                 response    = self.__get_checksum_response()
-                logger.debug(f"[WZB] get_checksum_response: {response['crc']}")
+                logger.critical(f"[WZB] get_checksum_response: {response['crc']}")
                 validate_crc()
 
         response = self.__calculate_checksum()
