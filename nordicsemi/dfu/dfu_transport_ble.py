@@ -530,8 +530,9 @@ class DfuTransportBle(DfuTransport):
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
                 self.__execute()
-            except ValidationException:
-                pass
+            except ValidationException as error:
+                logger.critical(f"BLE: Error occurred during init packet send at attempt {r + 1}: {error}")
+                continue
             break
         else:
             raise NordicSemiException("Failed to send init packet")
@@ -579,8 +580,20 @@ class DfuTransportBle(DfuTransport):
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
                     self.__execute()
-                except ValidationException:
-                    pass
+                except ValidationException as error:
+                    logger.debug("BLE: ValidationException Error occurred during firmware send at "
+                                    f"attempt {r + 1}: {error}")
+                    continue
+                except NordicSemiException as error:
+                    if "Timeout: operation - CalcChecSum" in error.msg:
+                        logger.critical("BLE: Timeout: operation - CalcChecSum Error occurred during firmware send at "
+                                        f"attempt {r + 1}. Trying to reconnect")
+                        self.close()
+                        self.open()
+                        response = self.__select_data()
+                        try_to_recover()
+                        break
+                    raise
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
