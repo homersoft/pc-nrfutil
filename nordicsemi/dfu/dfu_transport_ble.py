@@ -43,8 +43,6 @@ import struct
 import logging
 import binascii
 
-from dbus import DBusException
-
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
 from pc_ble_driver_py.exceptions    import NordicSemiException, IllegalStateException
 from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnableParams, BLEUUIDBase, BLEGapSecKDist, BLEGapSecParams, \
@@ -246,8 +244,8 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
                 if self.evt_sync.wait('disconnected', timeout=1) is None:
                     break
 
-                logger.critical("[verify_stable_connection] Received unexpected disconnect event, "
-                                "trying to re-connect to: {}".format(self.target_device_addr))
+                logger.warning("Received unexpected disconnect event, "
+                               "trying to re-connect to: {}".format(self.target_device_addr))
                 time.sleep(1)
 
                 self.adapter.connect(address=self.target_device_addr_type,
@@ -258,7 +256,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
                 if self.evt_sync.wait('disconnected', timeout=1) is not None:
                     raise Exception("Failure - Connection failed due to 0x3e")
 
-            logger.critical("[verify_stable_connection] Successfully Connected")
+            logger.info("Successfully Connected")
             return
 
         self.adapter.driver.ble_gap_scan_stop()
@@ -532,9 +530,8 @@ class DfuTransportBle(DfuTransport):
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
                 self.__execute()
-            except ValidationException as error:
-                logger.critical(f"BLE: Error occurred during init packet send at attempt {r + 1}: {error}")
-                continue
+            except ValidationException:
+                pass
             break
         else:
             raise NordicSemiException("Failed to send init packet")
@@ -543,7 +540,6 @@ class DfuTransportBle(DfuTransport):
         def try_to_recover():
             if response['offset'] == 0:
                 # Nothing to recover
-                logger.critical(f"trying to recover, offset==0 CRC: {response['crc']}")
                 return
 
             expected_crc = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
@@ -553,7 +549,6 @@ class DfuTransportBle(DfuTransport):
                 # Invalid CRC. Remove corrupted data.
                 response['offset'] -= remainder if remainder != 0 else response['max_size']
                 response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
-                logger.critical(f"trying to recover, different crc CRC: {response['crc']}")
                 return
 
             if (remainder != 0) and (response['offset'] != len(firmware)):
@@ -564,31 +559,25 @@ class DfuTransportBle(DfuTransport):
                                                              crc    = response['crc'],
                                                              offset = response['offset'])
                     response['offset'] += len(to_send)
-                    logger.critical(f"sending rest of data, validationexception, CRC: {response['crc']}")
                 except ValidationException:
                     # Remove corrupted data.
                     response['offset'] -= remainder
                     response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
-                    logger.critical(f"trying to recover, validationexception, CRC: {response['crc']}")
                     return
-            logger.critical("trying to recover, pass, exit")
+
             self.__execute()
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=response['offset'])
 
         response = self.__select_data()
-        logger.debug(f"selected_data, CRC: {response['crc']}")
         response['crc'] = 0
         try_to_recover()
 
         for i in range(response['offset'], len(firmware), response['max_size']):
-            logger.critical(f"chunk {i}, offset : {response['offset']}")
             data = firmware[i:i+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
                 try:
                     self.__create_data(len(data))
-                    logger.debug(f"stream_data, crc: {response['crc']}")
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
-                    logger.debug(f"after stream_data, crc: {response['crc']}")
                     self.__execute()
                 except ValidationException as error:
                     logger.critical(f"BLE: ValidationException Error occurred during firmware send at "
@@ -606,29 +595,10 @@ class DfuTransportBle(DfuTransport):
                         try_to_recover()
                         break
                     raise
-                # except DBusException as error:
-                #     logger.critical(f" DBusException error: {error}")
-                #     self.close()
-                #     logger.critical("Connection closed")
-                #     self.open()
-                #     logger.critical("Connection opened")
-                #     response = self.__select_data()
-                #     #response = self.__calculate_checksum()
-                #     try_to_recover()
-                #     continue
-                # except Exception as error:
-                #     logger.critical(f"Different exception error: {error}")
-                #     logger.critical(f"type is: {error.__class__.__name__}")
-                #     self.close()
-                #     logger.critical("Connection closed")
-                #     self.open()
-                #     logger.critical("Connection opened")
-                #     continue
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
-            logger.debug("Event sent")
 
     def __set_prn(self):
         logger.debug("BLE: Set Packet Receipt Notification {}".format(self.prn))
@@ -698,11 +668,9 @@ class DfuTransportBle(DfuTransport):
             if self.prn == current_pnr:
                 current_pnr = 0
                 response    = self.__get_checksum_response()
-                logger.critical(f"[WZB] get_checksum_response: {response['crc']}")
                 validate_crc()
 
         response = self.__calculate_checksum()
-        logger.debug(f"[WZB] calculate_checksum: {response['crc']}")
         validate_crc()
 
         return crc
