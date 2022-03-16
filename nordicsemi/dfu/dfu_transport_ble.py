@@ -530,8 +530,9 @@ class DfuTransportBle(DfuTransport):
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
                 self.__execute()
-            except ValidationException:
-                pass
+            except ValidationException as error:
+                logger.critical(f"BLE: Error occurred during init packet send at attempt {r + 1}: {error}")
+                continue
             break
         else:
             raise NordicSemiException("Failed to send init packet")
