@@ -11,7 +11,7 @@
 
 
 pipelinePythonSCA(
-    baseBranch: "bluez_support",
+    baseBranch: "master",
     agentLabel: "pylint",
     pythonVersion: '3.6',
     additionalAptPkgs: 'libgirepository1.0-dev libdbus-glib-1-dev',
