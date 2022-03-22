@@ -550,13 +550,13 @@ class DfuTransportBle(DfuTransport):
             remainder    = response['offset'] % response['max_size']
 
             if expected_crc != response['crc']:
-                logger.debug("BLE: Invalid CRC. Remove corrupted data.")
+                logger.debug("BLE: Invalid CRC. Removing corrupted data.")
                 response['offset'] -= remainder if remainder != 0 else response['max_size']
                 response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
                 return
 
             if (remainder != 0) and (response['offset'] != len(firmware)):
-                logger.debug("BLE: Send rest of the page.")
+                logger.debug("BLE: Sending rest of the page.")
                 try:
                     to_send             = firmware[response['offset'] : response['offset'] + response['max_size'] - remainder]
                     response['crc']     = self.__stream_data(data   = to_send,
