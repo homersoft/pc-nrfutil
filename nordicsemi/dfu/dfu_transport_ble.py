@@ -344,7 +344,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.evt_sync.wait('conn_sec_update')
 
     def write_control_point(self, data):
-        logger.debug(f"Write control point: {data}")
+        logger.debug(f"Writing control point: {data}")
         self.adapter.write_req(self.conn_handle, DFUAdapter.CP_UUID, data)
 
     def write_data_point(self, data):
