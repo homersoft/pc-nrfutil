@@ -344,6 +344,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.evt_sync.wait('conn_sec_update')
 
     def write_control_point(self, data):
+        logger.debug(f"Writing control point: {data}")
         self.adapter.write_req(self.conn_handle, DFUAdapter.CP_UUID, data)
 
     def write_data_point(self, data):
@@ -531,7 +532,8 @@ class DfuTransportBle(DfuTransport):
                 self.__stream_data(data=init_packet)
                 self.__execute()
             except ValidationException as error:
-                logger.critical(f"BLE: Error occurred during init packet send at attempt {r + 1}: {error}")
+                logger.critical(f"BLE: ValidationException Error occurred during init packet send at "
+                                f"attempt {r + 1}: {error}")
                 continue
             break
         else:
@@ -539,21 +541,22 @@ class DfuTransportBle(DfuTransport):
 
     def send_firmware(self, firmware):
         def try_to_recover():
+            logger.debug("BLE: Trying to recover...")
             if response['offset'] == 0:
-                # Nothing to recover
+                logger.debug("BLE: Nothing to recover")
                 return
 
             expected_crc = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
             remainder    = response['offset'] % response['max_size']
 
             if expected_crc != response['crc']:
-                # Invalid CRC. Remove corrupted data.
+                logger.debug("BLE: Invalid CRC. Removing corrupted data.")
                 response['offset'] -= remainder if remainder != 0 else response['max_size']
                 response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
                 return
 
             if (remainder != 0) and (response['offset'] != len(firmware)):
-                # Send rest of the page.
+                logger.debug("BLE: Sending rest of the page.")
                 try:
                     to_send             = firmware[response['offset'] : response['offset'] + response['max_size'] - remainder]
                     response['crc']     = self.__stream_data(data   = to_send,
@@ -561,7 +564,7 @@ class DfuTransportBle(DfuTransport):
                                                              offset = response['offset'])
                     response['offset'] += len(to_send)
                 except ValidationException:
-                    # Remove corrupted data.
+                    logger.debug("BLE: ValidationException occurred. Removing corrupted data")
                     response['offset'] -= remainder
                     response['crc']     = binascii.crc32(firmware[:response['offset']]) & 0xFFFFFFFF
                     return
@@ -574,6 +577,7 @@ class DfuTransportBle(DfuTransport):
         try_to_recover()
 
         for i in range(response['offset'], len(firmware), response['max_size']):
+            logger.debug(f"Sending firmware chunk from offset: {i}")
             data = firmware[i:i+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
                 try:
@@ -581,7 +585,7 @@ class DfuTransportBle(DfuTransport):
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
                     self.__execute()
                 except ValidationException as error:
-                    logger.debug("BLE: ValidationException Error occurred during firmware send at "
+                    logger.critical("BLE: ValidationException Error occurred during firmware send at "
                                     f"attempt {r + 1}: {error}")
                     continue
                 except NordicSemiException as error:
@@ -592,6 +596,7 @@ class DfuTransportBle(DfuTransport):
                         self.open()
                         response = self.__select_data()
                         try_to_recover()
+                        logger.critical("BLE: Successfully recovered from CalcChecSum Error")
                         break
                     raise
                 break
@@ -611,11 +616,13 @@ class DfuTransportBle(DfuTransport):
         self.__create_object(0x02, size)
 
     def __create_object(self, object_type, size):
+        logger.debug(f"BLE: Creating object: {object_type}")
         self.dfu_adapter.write_control_point([DfuTransportBle.OP_CODE['CreateObject'], object_type]\
                                             + list(struct.pack('<L', size)))
         self.__get_response(DfuTransportBle.OP_CODE['CreateObject'])
 
     def __calculate_checksum(self):
+        logger.debug("BLE: Calculating checksum")
         self.dfu_adapter.write_control_point([DfuTransportBle.OP_CODE['CalcChecSum']])
         response = self.__get_response(DfuTransportBle.OP_CODE['CalcChecSum'])
 
@@ -623,6 +630,7 @@ class DfuTransportBle(DfuTransport):
         return {'offset': offset, 'crc': crc}
 
     def __execute(self):
+        logger.debug("BLE: Executing the object")
         self.dfu_adapter.write_control_point([DfuTransportBle.OP_CODE['Execute']])
         self.__get_response(DfuTransportBle.OP_CODE['Execute'])
 
@@ -650,6 +658,7 @@ class DfuTransportBle(DfuTransport):
     def __stream_data(self, data, crc=0, offset=0):
         logger.debug("BLE: Streaming Data: len:{0} offset:{1} crc:0x{2:08X}".format(len(data), offset, crc))
         def validate_crc():
+            logger.debug("BLE: Validating CRC")
             if (crc != response['crc']):
                 raise ValidationException('Failed CRC validation.\n'\
                                 + 'Expected: {} Received: {}.'.format(crc, response['crc']))
@@ -683,7 +692,7 @@ class DfuTransportBle(DfuTransport):
         except queue.Empty:
             raise NordicSemiException('Timeout: operation - {}'.format(get_dict_key(DfuTransportBle.OP_CODE,
                                                                                     operation)))
-
+        logger.debug(f"BLE: Received response: {resp}")
         if resp[0] != DfuTransportBle.OP_CODE['Response']:
             raise NordicSemiException('No Response: 0x{:02X}'.format(resp[0]))
 
