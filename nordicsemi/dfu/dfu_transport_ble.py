@@ -576,13 +576,13 @@ class DfuTransportBle(DfuTransport):
         response['crc'] = 0
         try_to_recover()
 
-        for i in range(response['offset'], len(firmware), response['max_size']):
-            logger.debug(f"Sending firmware chunk from offset: {i}")
-            data = firmware[i:i+response['max_size']]
+        for current_offset in range(response['offset'], len(firmware), response['max_size']):
+            logger.debug(f"Sending firmware chunk from offset: {current_offset}")
+            data = firmware[current_offset:current_offset+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
                 try:
                     self.__create_data(len(data))
-                    response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
+                    response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during firmware send at "
@@ -595,9 +595,16 @@ class DfuTransportBle(DfuTransport):
                         self.close()
                         self.open()
                         response = self.__select_data()
-                        try_to_recover()
-                        logger.critical("BLE: Successfully recovered from CalcChecSum Error")
-                        break
+                        if response["offset"] == current_offset:
+                            logger.critical("BLE: Response offset is the same as the current offset. "
+                                            "Trying again to send the whole data.")
+                            continue
+                        else:
+                            logger.critical("BLE: Response offset is different from the current offset. "
+                                            "Trying to send the rest of the data.")
+                            try_to_recover()
+                            logger.critical("BLE: The rest of the data has been successfully sent")
+                            break
                     raise
                 break
             else:
