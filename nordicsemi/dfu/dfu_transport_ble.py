@@ -344,7 +344,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.evt_sync.wait('conn_sec_update')
 
     def write_control_point(self, data):
-        logger.debug(f"Writing control point: {data}")
+        logger.debug(f"BLE: Writing control point: {data}")
         self.adapter.write_req(self.conn_handle, DFUAdapter.CP_UUID, data)
 
     def write_data_point(self, data):
@@ -627,6 +627,7 @@ class DfuTransportBle(DfuTransport):
         response = self.__get_response(DfuTransportBle.OP_CODE['CalcChecSum'])
 
         (offset, crc) = struct.unpack('<II', bytearray(response))
+        logger.debug("BLE: Received CalcChecSum Response: offset:{0} crc:0x{1:08X}".format(offset, crc))
         return {'offset': offset, 'crc': crc}
 
     def __execute(self):
@@ -645,8 +646,8 @@ class DfuTransportBle(DfuTransport):
         self.dfu_adapter.write_control_point([DfuTransportBle.OP_CODE['ReadObject'], object_type])
         response = self.__get_response(DfuTransportBle.OP_CODE['ReadObject'])
 
-        (max_size, offset, crc)= struct.unpack('<III', bytearray(response))
-        logger.debug("BLE: Object selected: max_size:{} offset:{} crc:{}".format(max_size, offset, crc))
+        (max_size, offset, crc) = struct.unpack('<III', bytearray(response))
+        logger.debug("BLE: Object selected: max_size:{0} offset:{1} crc:0x{2:08X}".format(max_size, offset, crc))
         return {'max_size': max_size, 'offset': offset, 'crc': crc}
 
     def __get_checksum_response(self):
