@@ -344,7 +344,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.evt_sync.wait('conn_sec_update')
 
     def write_control_point(self, data):
-        logger.debug(f"Writing control point: {data}")
+        logger.debug(f"BLE: Writing control point: {data}")
         self.adapter.write_req(self.conn_handle, DFUAdapter.CP_UUID, data)
 
     def write_data_point(self, data):
@@ -576,13 +576,13 @@ class DfuTransportBle(DfuTransport):
         response['crc'] = 0
         try_to_recover()
 
-        for i in range(response['offset'], len(firmware), response['max_size']):
-            logger.debug(f"Sending firmware chunk from offset: {i}")
-            data = firmware[i:i+response['max_size']]
+        for current_offset in range(response['offset'], len(firmware), response['max_size']):
+            logger.debug(f"Sending firmware chunk from offset: {current_offset}")
+            data = firmware[current_offset:current_offset+response['max_size']]
             for r in range(DfuTransportBle.RETRIES_NUMBER):
                 try:
                     self.__create_data(len(data))
-                    response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
+                    response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during firmware send at "
@@ -595,9 +595,16 @@ class DfuTransportBle(DfuTransport):
                         self.close()
                         self.open()
                         response = self.__select_data()
-                        try_to_recover()
-                        logger.critical("BLE: Successfully recovered from CalcChecSum Error")
-                        break
+                        if response["offset"] == current_offset:
+                            logger.critical("BLE: Response offset is the same as the current offset. "
+                                            "Trying again to send the whole data.")
+                            continue
+                        else:
+                            logger.critical("BLE: Response offset is different from the current offset. "
+                                            "Trying to send the rest of the data.")
+                            try_to_recover()
+                            logger.critical("BLE: The rest of the data has been successfully sent")
+                            break
                     raise
                 break
             else:
@@ -627,6 +634,7 @@ class DfuTransportBle(DfuTransport):
         response = self.__get_response(DfuTransportBle.OP_CODE['CalcChecSum'])
 
         (offset, crc) = struct.unpack('<II', bytearray(response))
+        logger.debug("BLE: Received CalcChecSum Response: offset:{0} crc:0x{1:08X}".format(offset, crc))
         return {'offset': offset, 'crc': crc}
 
     def __execute(self):
@@ -645,8 +653,8 @@ class DfuTransportBle(DfuTransport):
         self.dfu_adapter.write_control_point([DfuTransportBle.OP_CODE['ReadObject'], object_type])
         response = self.__get_response(DfuTransportBle.OP_CODE['ReadObject'])
 
-        (max_size, offset, crc)= struct.unpack('<III', bytearray(response))
-        logger.debug("BLE: Object selected: max_size:{} offset:{} crc:{}".format(max_size, offset, crc))
+        (max_size, offset, crc) = struct.unpack('<III', bytearray(response))
+        logger.debug("BLE: Object selected: max_size:{0} offset:{1} crc:0x{2:08X}".format(max_size, offset, crc))
         return {'max_size': max_size, 'offset': offset, 'crc': crc}
 
     def __get_checksum_response(self):
