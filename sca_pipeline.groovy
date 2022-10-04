@@ -7,7 +7,7 @@
 // During the first launch, you have to enter ALTERNATIVE_VERSION parameter.
 
 
-@Library('JenkinsMain@2.16.15')_
+@Library('JenkinsMain@2.19.17')_
 
 
 pipelinePythonSCA(
