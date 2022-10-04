@@ -18,4 +18,5 @@ pipelinePythonSCA(
     installFromSetup: true,
     runPipCheck: true,
     runUnitTests: false,
+    credentials: '1479b83d-f7b2-4823-8105-549616393cc5'
 )
