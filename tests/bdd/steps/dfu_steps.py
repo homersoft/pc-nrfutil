@@ -41,48 +41,43 @@ import subprocess
 import time
 
 from click.testing import CliRunner
+import click
 from behave import then, given
 
 from nordicsemi.__main__ import cli
 from nordicsemi.lister.device_lister import DeviceLister
 from pc_ble_driver_py import config
-connectivity_root = os.path.join(os.path.dirname(config.__file__), 'hex', 'sd_api_v3')
+connectivity_root = os.path.join(os.path.dirname(config.__file__), 'hex', 'sd_api_v5')
 
 
-ENUMERATE_WAIT_TIME = 2.0 # Seconds to wait for enumeration to finish
+ENUMERATE_WAIT_TIME = 5.0 # Seconds to wait for enumeration to finish
+
+all_boards = {
+    'PCA10056': DeviceLister().get_device(get_all=True, vendor_id='1366'),
+    'PCA10059': DeviceLister().get_device(get_all=True, vendor_id='1915')
+}
+boards = {}
+
+
+def exe_runner(exe_name):
+    @click.command(name=exe_name, context_settings=dict(ignore_unknown_options=True,))
+    @click.argument('command', nargs=-1)
+    def f(command):
+        subprocess.run([exe_name, *command], shell=True)
+    return f
+
 
 def resolve_hex_path(filename):
     if filename == "connectivity":
         hex_version = config.get_connectivity_hex_version()
-        filename = 'connectivity_{}_115k2_with_s132_3.1.hex'.format(hex_version)
+        filename = f'connectivity_{hex_version}_1m_with_s132_5.1.0.hex'
         return os.path.join(connectivity_root, filename)
     elif filename == "connectivity_usb":
         hex_version = config.get_connectivity_hex_version()
-        filename = 'connectivity_{}_usb_for_s132_3.hex'.format(hex_version)
-
-        runner = CliRunner()
-
-        # Creating connectivity dfu package with trigger interface
-        args = ["pkg", "generate",
-        "--application", os.path.join(connectivity_root, filename),
-        "--softdevice", os.path.join(connectivity_root, "s132_nrf52_3.1.0_softdevice.hex"),
-        "--sd-req", "0",
-        "--sd-id", "0x91",
-        "--hw-version", "52",
-        "--application-version", "0",
-        os.path.join(connectivity_root, filename.replace(".hex", ".zip"))]
-
-        result = runner.invoke(cli, args)
-        assert result.exit_code == 0, "Could not create DFU package for trigger interface test."
-        return os.path.join(connectivity_root, filename.replace(".hex", ".zip"))
-
+        filename = f'connectivity_{hex_version}_usb_with_s132_5.1.0_dfu_pkg.zip'
+        return os.path.join(connectivity_root, filename)
     else:
-        filename = os.path.join(*filename.split("\\"))
-        assert "SDK_ROOT" in os.environ, \
-        "Environment variable 'SDK_ROOT' must be exported"
-
-        SDK_ROOT = os.environ["SDK_ROOT"]
-        return os.path.join(SDK_ROOT, filename)
+        return os.path.join(*filename.split("\\"))
 
 
 def find_nrfjprog(program):
@@ -105,6 +100,7 @@ def find_nrfjprog(program):
 
     return None
 
+
 def program_image_usb_serial(context, nrfjprog, full_image_path, snr):
     lister = DeviceLister()
 
@@ -113,7 +109,6 @@ def program_image_usb_serial(context, nrfjprog, full_image_path, snr):
     time.sleep(ENUMERATE_WAIT_TIME) # Waiting for device to enumerate
 
     devices_before_programming = lister.get_device(get_all=True, vendor_id="1915", product_id="521F")
-
     return_code = subprocess.call("\"{nrfjprog}\" --program {image} --chiperase -r  --snr {snr}"
     .format(nrfjprog=nrfjprog, image=full_image_path, snr=snr), shell=True)
 
@@ -123,7 +118,6 @@ def program_image_usb_serial(context, nrfjprog, full_image_path, snr):
     time.sleep(ENUMERATE_WAIT_TIME) # Waiting for device to enumerate
 
     devices_after_programming = lister.get_device(get_all=True, vendor_id="1915", product_id="521F")
-
     dfu_device = None
 
     for device in devices_after_programming:
@@ -186,6 +180,7 @@ logger = logging.getLogger(__file__)
 
 STDOUT_TEXT_WAIT_TIME = 50  # Number of seconds to wait for expected output from stdout
 
+
 @given('the user wants to perform dfu {dfu_type}')
 def step_impl(context, dfu_type):
     runner = CliRunner()
@@ -194,23 +189,34 @@ def step_impl(context, dfu_type):
 
     context.args = args
 
+
 @given('using package {package}')
 def step_impl(context, package):
     full_package_path = resolve_hex_path(package)
     context.args.extend(['-pkg', full_package_path])
     context.pkg = full_package_path
 
+
 @given('option {args}')
 def step_impl(context, args):
     context.args.extend(args.split(" "))
 
+
 @given('-snr {device}')
 def step_impl(context, device):
-    assert device in os.environ, \
-    "Environment variable '{}' must be exported with device serial number".format(device)
-
-    snr = str(os.environ[device])
+    snr = False
+    if device not in os.environ and device not in boards:
+        try:
+            boards[device] = all_boards[device.split('_')[0]].pop()
+            snr = boards[device].serial_number.lower().lstrip('0')
+        except:
+            assert False, "Environment variable '{}' must be exported with device serial number or a device must be connected".format(device)
+    elif device in os.environ:
+        snr = os.environ[device].lower().lstrip('0') # Remove zeros to the left.
+    else:
+        snr = boards[device].serial_number.lower().lstrip('0')
     context.args.extend(["-snr", snr])
+
 
 @given('nrfjprog {image} for {image_type} {board}')
 def step_impl(context, image, image_type, board):
@@ -223,10 +229,16 @@ def step_impl(context, image, image_type, board):
 
     assert nrfjprog, "nrfjprog is not installed"
 
-    assert board in os.environ, \
-    "Environment variable '{}' must be exported with JLink serial number".format(board)
-
-    snr = str(int(os.environ[board])) # Remove zeros to the left.
+    if board not in os.environ and board not in boards:
+        try:
+            boards[board] = all_boards[board.split('_')[0]].pop()
+            snr = boards[board].serial_number.lower().lstrip('0')
+        except:
+            assert False, "Environment variable '{}' must be exported with JLink serial number or a JLink board must be connected".format(board)
+    elif board in os.environ:
+        snr = str(int(os.environ[board])) # Remove zeros to the left.
+    else:
+        snr = boards[board].serial_number.lower().lstrip('0')
 
     if image_type == "usb-serial":
         port = program_image_usb_serial(context, nrfjprog, full_image_path, snr)
@@ -242,11 +254,48 @@ def step_impl(context, image, image_type, board):
         assert False, "Invalid dfu transport."
 
 
+@then('perform dfu using nrfutil {nrfutil}')
+def step_impl(context, nrfutil):
+    if nrfutil not in os.environ:
+        nrfutil = cli
+    else:
+        nrfutil = exe_runner(os.environ[nrfutil])
+
+    result = context.runner.invoke(nrfutil, context.args)
+    logger.debug("exit_code: %s, output: \'%s\'", result.exit_code, result.output)
+    assert result.exit_code == 0, "exit_code: {}, output: \'{}\'".format( result.exit_code, result.output)
+    time.sleep(ENUMERATE_WAIT_TIME) # Waiting some time to ensure enumeration before next test.
 
 
-@then('perform dfu')
+@then('perform dfu twice with port change')
 def step_impl(context):
+    lister = DeviceLister()
+
+    devices_before_programming = lister.get_device(get_all=True, vendor_id="1915", product_id="521F")
+
     result = context.runner.invoke(cli, context.args)
     logger.debug("exit_code: %s, output: \'%s\'", result.exit_code, result.output)
-    assert result.exit_code == 0
+    assert result.exit_code == 0, "exit_code: {}, output: \'{}\'".format( result.exit_code, result.output)
+    time.sleep(ENUMERATE_WAIT_TIME) # Waiting for device to enumerate
+
+    devices_after_programming = lister.get_device(get_all=True, vendor_id="1915", product_id="C00A")
+    dfu_device = None
+
+    for device in devices_after_programming:
+        match = False
+        for device_old in devices_before_programming:
+            if device.serial_number == device_old.serial_number:
+                dfu_device = device
+                match = True
+                break
+        if match:
+            break
+
+    assert dfu_device, "Device was programmed, but did not enumerate in {} seconds.".format(ENUMERATE_WAIT_TIME)
+
+    port = dfu_device.get_first_available_com_port()
+    context.args[-1] = port
+    result = context.runner.invoke(cli, context.args)
+    logger.debug("exit_code: %s, output: \'%s\'", result.exit_code, result.output)
+    assert result.exit_code == 0, "exit_code: {}, output: \'{}\'".format( result.exit_code, result.output)
     time.sleep(ENUMERATE_WAIT_TIME) # Waiting some time to ensure enumeration before next test.

@@ -173,7 +173,7 @@ class BLDFUSettings:
         return binascii.crc32(bytearray(list)) & 0xFFFFFFFF
 
     def generate(self, arch, app_file, app_ver, bl_ver, bl_sett_ver, custom_bl_sett_addr, no_backup,
-                 backup_address, app_boot_validation_type, sd_boot_validation_type, sd_file, key_file):
+                 backup_address, app_boot_validation_type, sd_boot_validation_type, sd_file, signer):
 
         self.set_arch(arch)
 
@@ -217,7 +217,7 @@ class BLDFUSettings:
                 self.app_boot_validation_bytes = Package.calculate_sha256_hash(self.app_bin)[::-1]
             elif app_boot_validation_type == 'VALIDATE_ECDSA_P256_SHA256':
                 self.app_boot_validation_type = 3 & 0xffffffff
-                self.app_boot_validation_bytes = Package.sign_firmware(key_file, self.app_bin)
+                self.app_boot_validation_bytes = Package.sign_firmware(signer, self.app_bin)
             else:  # This also covers 'NO_VALIDATION' case
                 self.app_boot_validation_type = 0 & 0xffffffff
                 self.app_boot_validation_bytes = bytes(0)
@@ -257,7 +257,7 @@ class BLDFUSettings:
                 self.sd_boot_validation_bytes = Package.calculate_sha256_hash(self.sd_bin)[::-1]
             elif sd_boot_validation_type == 'VALIDATE_ECDSA_P256_SHA256':
                 self.sd_boot_validation_type = 3 & 0xffffffff
-                self.sd_boot_validation_bytes = Package.sign_firmware(key_file, self.sd_bin)
+                self.sd_boot_validation_bytes = Package.sign_firmware(signer, self.sd_bin)
             else:  # This also covers 'NO_VALIDATION_CASE'
                 self.sd_boot_validation_type = 0 & 0xffffffff
                 self.sd_boot_validation_bytes = bytes(0)
@@ -273,7 +273,12 @@ class BLDFUSettings:
         # Fill the entire settings page with 0's
         for offset in range(0, self.setts.bytes_count):
             self.ihex[self.bl_sett_addr + offset] = 0x00
-
+            
+        # Make sure the hex-file is 32bit-word-aligned
+        fill_bytes = ((self.setts.bytes_count + 4 - 1) & ~(4 - 1)) - self.setts.bytes_count
+        for offset in range(self.setts.bytes_count, self.setts.bytes_count + fill_bytes):
+            self.ihex[self.bl_sett_addr + offset] = 0xFF
+        
         self._add_value_tohex(self.setts.sett_ver, self.bl_sett_ver)
         self._add_value_tohex(self.setts.app_ver, self.app_ver)
         self._add_value_tohex(self.setts.bl_ver, self.bl_ver)
@@ -310,6 +315,8 @@ class BLDFUSettings:
         if not no_backup:
             for offset in range(0, self.setts.bytes_count):
                 self.ihex[self.backup_address + offset] = self.ihex[self.bl_sett_addr + offset]
+            for offset in range(self.setts.bytes_count, self.setts.bytes_count + fill_bytes):
+                self.ihex[self.backup_address + offset] = 0xFF
 
     def probe_settings(self, base):
         # Unpack CRC and version

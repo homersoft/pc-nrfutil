@@ -40,7 +40,6 @@ import json
 import os
 
 # Nordic libraries
-from pc_ble_driver_py.exceptions import NotImplementedException
 from nordicsemi.dfu.model import HexType, FirmwareKeys
 
 
@@ -84,7 +83,7 @@ class ManifestGenerator:
             elif key == HexType.EXTERNAL_APPLICATION:
                 self.manifest.application = _firmware
             else:
-                raise NotImplementedException("Support for firmware type {0} not implemented yet.".format(key))
+                raise NotImplementedError("Support for firmware type {0} not implemented yet.".format(key))
 
         return self.to_json()
 
