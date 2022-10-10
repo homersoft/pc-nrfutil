@@ -13,7 +13,7 @@
 pipelinePythonSCA(
     baseBranch: "master",
     agentLabel: "pylint",
-    pythonVersion: '3.6',
+    pythonVersion: '3.8',
     additionalAptPkgs: 'libgirepository1.0-dev libdbus-glib-1-dev',
     installFromSetup: true,
     runPipCheck: true,
