@@ -1229,10 +1229,11 @@ def _ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, fla
 
     # Remove colons from address in case written in format XX:XX:XX:XX:XX:XX
     if address:
-        address = address.replace(':', '')
-        if not re.match('^[0-9A-Fa-f]{12}$', address):
-            raise click.BadParameter('Must be exactly 6 bytes HEX, '
-                                     'e.g. ABCDEF123456 or AB:CD:EF:12:34:56.', param_hint='address')
+        address = [single_address.replace(':', '') for single_address in address]
+        for single_address in address:
+            if not re.match('^[0-9A-Fa-f]{12}$', single_address):
+                raise click.BadParameter('Must be exactly 6 bytes HEX, '
+                                         'e.g. ABCDEF123456 or AB:CD:EF:12:34:56.', param_hint='address')
 
     if bluez:
         if platform.system().lower() != "linux":
