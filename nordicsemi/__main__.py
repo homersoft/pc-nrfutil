@@ -54,7 +54,6 @@ from nordicsemi.dfu.dfu_transport_serial import DfuTransportSerial
 from nordicsemi.dfu.package import Package
 from nordicsemi import version as nrfutil_version
 from nordicsemi.dfu.signing import Signing
-from nordicsemi.dfu.util import query_func
 from nordicsemi.zigbee.prod_config import ProductionConfig, ProductionConfigWrongException, ProductionConfigTooLargeException
 from pc_ble_driver_py.exceptions import NordicSemiException
 from nordicsemi.lister.device_lister import DeviceLister
@@ -63,7 +62,7 @@ import spinel.util as util
 logger = logging.getLogger(__name__)
 
 def ble_driver_init(conn_ic_id):
-    global BLEDriver, Flasher, DfuTransportBle
+    global BLEDriver, Flasher, DfuTransportBle, config
     from pc_ble_driver_py import config
     config.__conn_ic_id__ = conn_ic_id
     from pc_ble_driver_py.ble_driver    import BLEDriver, Flasher
@@ -141,6 +140,28 @@ def int_as_text_to_int(value):
         return int(value, 10)
     except ValueError:
         raise NordicSemiException('%s is not a valid integer' % value)
+
+# TODO: Create query function that maps query-result strings with functions
+def query_func(question, default=False):
+    """
+    Ask a string question
+    No input defaults to "no" which results in False
+    """
+    valid = {"yes": True, "y": True, "no": False, "n": False}
+    if default is True:
+        prompt = " [Y/n]"
+    else:
+        prompt = " [y/N]"
+
+    while True:
+        print("%s %s" % (question, prompt))
+        choice = input().lower()
+        if choice == '':
+            return default
+        elif choice in valid:
+            return valid[choice]
+        else:
+            print("Please respond with y/n")
 
 def pause():
     while True:
@@ -260,7 +281,7 @@ def settings():
               help='The application version.',
               type=BASED_INT_OR_NONE)
 @click.option('--application-version-string',
-              help='The application version string, e.g. "2.7.31". Will be converted to an integer, e.g. 207031.',
+              help='The application version string, e.g. "2.7.31". Will be converted to an integer, e.g. 20731.',
               type=click.STRING)
 @click.option('--bootloader-version',
               help='The bootloader version.',
@@ -353,9 +374,16 @@ def generate(hex_file,
     if bl_settings_version == 1 and (app_boot_validation or sd_boot_validation):
         raise click.BadParameter("Bootloader settings version 1 does not support boot validation.", param_hint='bl_settings_version')
 
-    if (app_boot_validation == 'VALIDATE_ECDSA_P256_SHA256' and key_file is None) or \
-        (sd_boot_validation == 'VALIDATE_ECDSA_P256_SHA256' and key_file is None):
-        raise click.UsageError("Key file must be given when 'VALIDATE_ECDSA_P256_SHA256' boot validation is used")
+    # load signing key (if needed) only once
+    if 'VALIDATE_ECDSA_P256_SHA256' in (app_boot_validation, sd_boot_validation):
+        if not os.path.isfile(key_file):
+            raise click.UsageError("Key file must be given when 'VALIDATE_ECDSA_P256_SHA256' boot validation is used")
+        signer = Signing()
+        default_key = signer.load_key(key_file)
+        if default_key:
+            display_sec_warning()
+    else:
+        signer = None
 
     if app_boot_validation and not application:
         raise click.UsageError("--application hex file must be set when using --app_boot_validation")
@@ -373,7 +401,7 @@ def generate(hex_file,
     sett.generate(arch=family, app_file=application, app_ver=application_version_internal, bl_ver=bootloader_version,
                   bl_sett_ver=bl_settings_version, custom_bl_sett_addr=start_address, no_backup=no_backup,
                   backup_address=backup_address, app_boot_validation_type=app_boot_validation,
-                  sd_boot_validation_type=sd_boot_validation, sd_file=softdevice, key_file=key_file)
+                  sd_boot_validation_type=sd_boot_validation, sd_file=softdevice, signer=signer)
     sett.tohexfile(hex_file)
 
     click.echo("\nGenerated Bootloader DFU settings .hex file and stored it in: {}".format(hex_file))
@@ -487,7 +515,7 @@ def pkg():
               help='The application version.',
               type=BASED_INT_OR_NONE)
 @click.option('--application-version-string',
-              help='The application version string, e.g. "2.7.31". Will be converted to an integer, e.g. 207031.',
+              help='The application version string, e.g. "2.7.31". Will be converted to an integer, e.g. 20731.',
               type=click.STRING)
 @click.option('--bootloader',
               help='The bootloader firmware file.',
@@ -510,12 +538,18 @@ def pkg():
                    '\n|s112_nrf52_6.1.1|0xB8|'
                    '\n|s112_nrf52_7.0.0|0xC4|'
                    '\n|s112_nrf52_7.0.1|0xCD|'
+                   '\n|s112_nrf52_7.2.0|0x103|'
+                   '\n|s112_nrf52_7.3.0|0x126|'
                    '\n|s113_nrf52_7.0.0|0xC3|'
                    '\n|s113_nrf52_7.0.1|0xCC|'
+                   '\n|s113_nrf52_7.2.0|0x102|'
+                   '\n|s113_nrf52_7.3.0|0x125|'
+                   '\n|s122_nrf52_8.0.0|0xEA|'
+                   '\n|s122_nrf52_8.1.1|0x112|'
                    '\n|s130_nrf51_1.0.0|0x67|'
                    '\n|s130_nrf51_2.0.0|0x80|'
-                   '\n|s132_nrf52_2.0.0|0x81|'
                    '\n|s130_nrf51_2.0.1|0x87|'
+                   '\n|s132_nrf52_2.0.0|0x81|'
                    '\n|s132_nrf52_2.0.1|0x88|'
                    '\n|s132_nrf52_3.0.0|0x8C|'
                    '\n|s132_nrf52_3.1.0|0x91|'
@@ -531,11 +565,15 @@ def pkg():
                    '\n|s132_nrf52_6.1.1|0xB7|'
                    '\n|s132_nrf52_7.0.0|0xC2|'
                    '\n|s132_nrf52_7.0.1|0xCB|'
+                   '\n|s132_nrf52_7.2.0|0x101|'
+                   '\n|s132_nrf52_7.3.0|0x124|'
                    '\n|s140_nrf52_6.0.0|0xA9|'
                    '\n|s140_nrf52_6.1.0|0xAE|'
                    '\n|s140_nrf52_6.1.1|0xB6|'
                    '\n|s140_nrf52_7.0.0|0xC1|'
                    '\n|s140_nrf52_7.0.1|0xCA|'
+                   '\n|s140_nrf52_7.2.0|0x100|'
+                   '\n|s140_nrf52_7.3.0|0x123|'
                    '\n|s212_nrf52_6.1.1|0xBC|'
                    '\n|s332_nrf52_6.1.1|0xBA|'
                    '\n|s340_nrf52_6.1.1|0xB9|',
@@ -608,9 +646,6 @@ def pkg():
               help='The zigbee OTA maximum hw version of Zigbee OTA Client.',
               required=False,
               type=BASED_INT_OR_NONE)
-
-
-
 def generate(zipfile,
            debug_mode,
            application,
@@ -811,7 +846,6 @@ def generate(zipfile,
     if zigbee and zigbee_ota_fw_version is None:
         zigbee_ota_fw_version = 0
 
-
     sd_req_list = []
     if sd_req is not None:
         try:
@@ -844,6 +878,7 @@ def generate(zipfile,
 
     if key_file is None:
         display_nokey_warning()
+        signer = None
     else:
         signer = Signing()
         default_key = signer.load_key(key_file)
@@ -904,7 +939,7 @@ def generate(zipfile,
                       softdevice,
                       sd_boot_validation,
                       app_boot_validation,
-                      key_file,
+                      signer,
                       inner_external_app,
                       zigbee,
                       zigbee_manufacturer_id,
@@ -941,7 +976,7 @@ def generate(zipfile,
                           None,
                           None,
                           None,
-                          key_file,
+                          signer,
                           True)
 
         package.generate_package(zipfile_path)
@@ -1095,24 +1130,40 @@ def serial(package, port, connect_delay, flow_control, packet_receipt_notificati
 
 
 def enumerate_ports():
-    descs   = list(BLEDriver.enum_serial_ports())
+    device_lister = DeviceLister()
+    descs = device_lister.enumerate()
     if len(descs) == 0:
-        return None
+        raise click.UsageError("\nNo boards found.")
+
     click.echo('Please select connectivity serial port:')
     for i, choice in enumerate(descs):
-        click.echo('\t{} : {} - {}'.format(i, choice.port, choice.serial_number))
+        click.echo('\t{} : {} - {}'.format(
+                                        i,
+                                        choice.get_first_available_com_port(),
+                                        choice.serial_number))
 
-    index = click.prompt('Enter your choice: ', type=click.IntRange(0, len(descs)))
-    return descs[index].port
+    index = click.prompt('Enter your choice: ',
+                         type=click.IntRange(0, len(descs)))
+    device = descs[index]
+    is_jlink = device.vendor_id == "1366"
+    return device.get_first_available_com_port(), is_jlink
 
 
 def get_port_by_snr(snr):
-    serial_ports = BLEDriver.enum_serial_ports()
-    try:
-        serial_port = [d.port for d in serial_ports if d.serial_number.lstrip('0') == snr.lstrip('0')][0]
-    except IndexError:
-        raise NordicSemiException('board not found')
-    return serial_port
+    device_lister = DeviceLister()
+    device = device_lister.get_device(serial_number=snr)
+    if not device:
+        raise NordicSemiException('Board not found')
+    is_jlink = device.vendor_id == "1366"
+    return device.get_first_available_com_port(), is_jlink
+
+
+def port_is_jlink(port):
+    device_lister = DeviceLister()
+    device = device_lister.get_device(com=port)
+    if not device:
+        raise NordicSemiException('Board not found')
+    return device.vendor_id == "1366"
 
 
 @dfu.command(short_help="Update the firmware on a device over a BLE connection.")
@@ -1215,32 +1266,47 @@ def _ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, fla
             click.echo("No target selected. Default device name: {} is used.".format(name))
 
         if port is None and jlink_snr is not None:
-            port = get_port_by_snr(jlink_snr)
-
+            port, is_jlink = get_port_by_snr(jlink_snr)
         elif port is None:
-            port = enumerate_ports()
-            if port is None:
-                raise click.UsageError("\nNo Segger USB CDC ports found, please connect your board.")
+            port, is_jlink = enumerate_ports()
+        else:
+            is_jlink = port_is_jlink(port)
 
         if flash_connectivity:
-            flasher = Flasher(serial_port=port, snr = jlink_snr)
-            if flasher.fw_check():
-                click.echo("Board already flashed with connectivity firmware.")
+            if is_jlink:
+                flasher = Flasher(serial_port=port, snr=jlink_snr)
+                if flasher.fw_check():
+                    click.echo("Board already flashed with connectivity firmware.")
+                else:
+                    click.echo("Flashing connectivity firmware...")
+                    flasher.fw_flash()
+                    click.echo("Connectivity firmware flashed.")
+                flasher.reset()
+                time.sleep(1)
             else:
                 click.echo("Flashing connectivity firmware...")
-                flasher.fw_flash()
+                serial_backend = DfuTransportSerial(com_port=str(port))
+                serial_backend.register_events_callback(DfuEvent.PROGRESS_EVENT,
+                                                        update_progress)
+                connectivity_firmware = os.path.join(
+                                            os.path.dirname(config.__file__),
+                                            "hex",
+                                            "sd_api_v5",
+                                            "connectivity_4.1.4_usb_with_s132_5.1.0_dfu_pkg.zip"
+                                        )
+                dfu = Dfu(zip_file_path=connectivity_firmware,
+                          dfu_transport=serial_backend,
+                          connect_delay=connect_delay)
+                dfu.dfu_send_images()
                 click.echo("Connectivity firmware flashed.")
-            flasher.reset()
-            time.sleep(1)
 
-            logger.info("Using connectivity board at serial port: {}".format(port))
-            ble_backend = DfuTransportBle(serial_port=str(port),
-                                          att_mtu=att_mtu,
-                                          target_device_name=str(name),
-                                          target_device_addr=address,
-                                          prn=packet_notification)
-            ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
-            dfu = Dfu(zip_file_path=package, dfu_transport=ble_backend, connect_delay=connect_delay)
+        logger.info("Using connectivity board at serial port: {}".format(port))
+        ble_backend = DfuTransportBle(serial_port=str(port),
+                                      att_mtu=att_mtu,
+                                      target_device_name=str(name),
+                                      target_device_addr=str(address))
+        ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
+        dfu = Dfu(zip_file_path=package, dfu_transport=ble_backend, connect_delay=connect_delay)
 
     if logger.getEffectiveLevel() > logging.INFO:
         with click.progressbar(length=dfu.dfu_get_total_size()) as bar:
@@ -1433,8 +1499,8 @@ def thread(package, port, address, server_port, panid, channel, jlink_snr, flash
             return 2
 
         elif port is None:
-            port = get_port_by_snr(jlink_snr)
-            if port is None:
+            port, is_jlink = get_port_by_snr(jlink_snr)
+            if port is None or not is_jlink:
                 click.echo("\nNo Segger USB CDC ports found, please connect your board.")
                 return 3
 
@@ -1540,20 +1606,45 @@ def zigbee():
     pass
 
 
-@zigbee.command(short_help='Generate the Zigbee Production Config hex file.', name='production_config')
+def _pretty_help_option(text: str):
+    formatted_lines = []
+    for line in text.split("\n"):
+        formatted_lines.append(line + " " * 100)
+    return "\n".join(formatted_lines)
+
+
+@zigbee.command(short_help='Generate the Zigbee Production Config (version 1) hex file.',
+                name='production_config',)
 @click.argument('input', required=True, type=click.Path())
 @click.argument('output', required=True, type=click.Path())
-@click.option('--offset',
-              help='Offset at which the Production Config is located',
-              type=BASED_INT_OR_NONE)
+@click.option('--offset', type=BASED_INT_OR_NONE, help=_pretty_help_option(
+    "Offset at which the Production Config is located.\n"
+    "Depending on the SDK and the device versions, use the following values:\n"
+    f"{ProductionConfig.offset_help()}"
+    f"By default, the value for {ProductionConfig.DEFAULT_OFFSET_SDK} "
+    f"{ProductionConfig.DEFAULT_OFFSET_CHIP} is used."))
 def production_config(input, output, offset):
     """
     Generate the Production config hex file for Zigbee Devices out of YAML-structured description.
+    Generated Production config is in version 1.
+
+    INPUT - path to yaml file.\n
+            Example yaml content:
+
+    \b
+                channel_mask: 0x00100000
+                install_code: 83FED3407A939723A5C639B26916D505
+                extended_address: AABBCCDDEEFF0011
+                tx_power: 9
+                app_data: 01ABCD
+
+    OUTPUT - name of output file
     """
     try:
         pc = ProductionConfig(input)
     except ProductionConfigWrongException:
-        raise click.UsageError("Input YAML file format wrong. Please see the example YAML file in the documentation.")
+        raise click.UsageError("Input YAML file format wrong."
+                               " Please see the example YAML file in the documentation.")
 
     try:
         if offset is None:
@@ -1562,7 +1653,7 @@ def production_config(input, output, offset):
             pc.generate(output, offset=offset)
         click.echo("Production Config hexfile generated.")
     except ProductionConfigTooLargeException as e:
-        raise click.UsageError("Production Config too large: " + str(e.length) + " bytes")
+        raise click.UsageError(f"Production Config too large: {e.length} bytes")
 
 
 if __name__ == '__main__':
