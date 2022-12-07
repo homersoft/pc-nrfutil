@@ -37,12 +37,15 @@
 
 # Python standard library
 import time
+from typing import Optional
+
 import wrapt
 import queue
 import struct
 import logging
 import binascii
 
+from nordicsemi.dfu.dfu_faults import DFUFaultManager, DFUStage
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
 from pc_ble_driver_py.exceptions    import NordicSemiException, IllegalStateException
 from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnableParams, BLEUUIDBase, BLEGapSecKDist, BLEGapSecParams, \
@@ -449,7 +452,8 @@ class DfuTransportBle(DfuTransport):
                  target_device_addr=None,
                  baud_rate=1000000,
                  prn=0,
-                 bluez=False):
+                 bluez=False,
+                 dfu_fault_manager: Optional[DFUFaultManager] = None):
 
         super().__init__()
         DFUAdapter.LOCAL_ATT_MTU = att_mtu
@@ -462,6 +466,7 @@ class DfuTransportBle(DfuTransport):
         self.dfu_adapter        = None
         self.prn                = prn
         self.bluez              = bluez
+        self.dfu_fault_manager  = dfu_fault_manager
 
         self.bonded             = False
         self.keyset             = None
@@ -531,6 +536,9 @@ class DfuTransportBle(DfuTransport):
             try:
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
+                fault = self.dfu_fault_manager.on_crc_validation(current_dfu_stage=DFUStage.INIT_PACKET)
+                if fault is not None:
+                    raise ValidationException("Simulating CRC Validation Fault")
                 self.__execute()
             except ValidationException as error:
                 logger.critical(f"BLE: ValidationException Error occurred during init packet send at "
@@ -584,6 +592,9 @@ class DfuTransportBle(DfuTransport):
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
+                    fault = self.dfu_fault_manager.on_crc_validation(current_dfu_stage=DFUStage.FIRMWARE_UPDATE)
+                    if fault is not None:
+                        raise ValidationException("Simulating CRC Validation Fault")
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during sending firmware chunk at "
