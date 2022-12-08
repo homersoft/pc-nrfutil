@@ -467,6 +467,7 @@ class DfuTransportBle(DfuTransport):
         self.prn                = prn
         self.bluez              = bluez
         self.dfu_fault_manager  = dfu_fault_manager
+        self.current_dfu_stage  = None
 
         self.bonded             = False
         self.keyset             = None
@@ -536,7 +537,6 @@ class DfuTransportBle(DfuTransport):
             try:
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
-                self.__handle_fault_manager_crc_validation_fault(DFUStage.INIT_PACKET)
                 self.__execute()
             except ValidationException as error:
                 logger.critical(f"BLE: ValidationException Error occurred during init packet send at "
@@ -590,7 +590,6 @@ class DfuTransportBle(DfuTransport):
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
-                    self.__handle_fault_manager_crc_validation_fault(DFUStage.FIRMWARE_UPDATE)
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during sending firmware chunk at "
@@ -619,14 +618,10 @@ class DfuTransportBle(DfuTransport):
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
 
-    def __handle_fault_manager_crc_validation_fault(self, current_dfu_stage: DFUStage):
-        """
-        Handles simulation of CRC Validation Fault.
-
-        :param current_dfu_stage: Current DFU Stage
-        """
+    def __handle_fault_manager_crc_validation_fault(self):
+        """ Handles simulation of CRC Validation Fault """
         if self.dfu_fault_manager is not None:
-            fault = self.dfu_fault_manager.on_crc_validation(current_dfu_stage)
+            fault = self.dfu_fault_manager.on_crc_validation(self.current_dfu_stage)
             if fault is not None:
                 raise ValidationException("Simulating CRC Validation Fault")
 
@@ -662,9 +657,11 @@ class DfuTransportBle(DfuTransport):
         self.__get_response(DfuTransportBle.OP_CODE['Execute'])
 
     def __select_command(self):
+        self.current_dfu_stage = DFUStage.INIT_PACKET
         return self.__select_object(0x01)
 
     def __select_data(self):
+        self.current_dfu_stage = DFUStage.FIRMWARE_UPDATE
         return self.__select_object(0x02)
 
     def __select_object(self, object_type):
@@ -706,6 +703,7 @@ class DfuTransportBle(DfuTransport):
                 validate_crc()
 
         response = self.__calculate_checksum()
+        self.__handle_fault_manager_crc_validation_fault()
         validate_crc()
 
         return crc
