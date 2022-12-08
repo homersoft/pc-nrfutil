@@ -23,7 +23,7 @@ class DFUStage(Enum):
 
 class DFUFault:
     def __init__(self, fault_type: DFUFaultType, target_dfu_stage: DFUStage, call_number: Optional[int] = None,
-                 callback_function: Callable = None):
+                 callback_function: Optional[Callable] = None):
         """
         Construct DFU fault object.
 
@@ -31,7 +31,7 @@ class DFUFault:
         :param target_dfu_stage: desired DFU stage during which the fault should be generated
         :param call_number: number of call (starting from 1) on which fault should be generated.
                             None to generate fault on every call
-        :param callback_function: function that will be called when fault should occur
+        :param callback_function: optional function that will be called when fault should occur
 
         """
         if call_number is not None:

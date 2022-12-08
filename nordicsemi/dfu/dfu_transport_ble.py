@@ -536,9 +536,7 @@ class DfuTransportBle(DfuTransport):
             try:
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
-                fault = self.dfu_fault_manager.on_crc_validation(current_dfu_stage=DFUStage.INIT_PACKET)
-                if fault is not None:
-                    raise ValidationException("Simulating CRC Validation Fault")
+                self.__handle_fault_manager_crc_validation_fault(DFUStage.INIT_PACKET)
                 self.__execute()
             except ValidationException as error:
                 logger.critical(f"BLE: ValidationException Error occurred during init packet send at "
@@ -592,9 +590,7 @@ class DfuTransportBle(DfuTransport):
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
-                    fault = self.dfu_fault_manager.on_crc_validation(current_dfu_stage=DFUStage.FIRMWARE_UPDATE)
-                    if fault is not None:
-                        raise ValidationException("Simulating CRC Validation Fault")
+                    self.__handle_fault_manager_crc_validation_fault(DFUStage.FIRMWARE_UPDATE)
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during sending firmware chunk at "
@@ -622,6 +618,17 @@ class DfuTransportBle(DfuTransport):
             else:
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
+
+    def __handle_fault_manager_crc_validation_fault(self, current_dfu_stage: DFUStage):
+        """
+        Handles simulation of CRC Validation Fault.
+
+        :param current_dfu_stage: Current DFU Stage
+        """
+        if self.dfu_fault_manager is not None:
+            fault = self.dfu_fault_manager.on_crc_validation(current_dfu_stage)
+            if fault is not None:
+                raise ValidationException("Simulating CRC Validation Fault")
 
     def __set_prn(self):
         logger.debug("BLE: Set Packet Receipt Notification {}".format(self.prn))
