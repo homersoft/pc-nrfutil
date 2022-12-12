@@ -25,8 +25,8 @@ class DFUFault:
 
         :param fault_type: type of fault to generate
         :param target_dfu_stage: desired DFU stage during which the fault should be generated
-        :param delay_s: delay in seconds (counted from entering the target DFU stage) after which fault should be
-                        generated. None to generate fault on every possible call (permanent fault).
+        :param delay_s: delay in seconds (counted from first possible fault call in the target DFU stage) after which
+                        fault should be generated. None to generate fault on every possible call (permanent fault).
                         NOTE: Delay parameter assumes that the call_fault method is called repeatedly during the
                               dfu procedure (e.g. after sending each data chunk). This is needed to calculate the
                               elapsed DFU stage time. When the time is higher or equal to the delay the the fault is
@@ -73,8 +73,8 @@ class DFUFaultsFactory:
         Create fault that simulates CRC Validation Error.
 
         :param target_dfu_stage: desired DFU stage during which the fault should be generated
-        :param delay_s: delay in seconds (counted from entering the target DFU stage) after which fault should be
-                        generated. None to generate fault on every possible call (permanent fault).
+        :param delay_s: delay in seconds (counted from first possible fault call in the target DFU stage) after which
+                        fault should be generated. None to generate fault on every possible call (permanent fault).
         :param callback_function: function that will be called when fault should occur
         :return DFUFault object with defined CRC_VALIDATION fault details
         """
@@ -101,10 +101,7 @@ class DFUFaultManager:
 
         :param fault_type: type of the dfu fault
         """
-        for stored_fault_type, stored_fault in self.dfu_faults.items():
-            if stored_fault_type == fault_type:
-                return stored_fault
-        return None
+        return self.dfu_faults.get(fault_type, None)
 
     def on_crc_validation(self, current_dfu_stage: DFUStage) -> Optional[DFUFault]:
         """
