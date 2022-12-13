@@ -36,6 +36,8 @@
 #
 import ipaddress
 import signal
+from typing import Optional
+
 
 """nrfutil command line tool."""
 import os
@@ -49,6 +51,7 @@ sys.path.append(os.getcwd())
 
 from nordicsemi.dfu.bl_dfu_sett import BLDFUSettings
 from nordicsemi.dfu.dfu import Dfu
+from nordicsemi.dfu.dfu_faults import DFUFaultManager
 from nordicsemi.dfu.dfu_transport import DfuEvent, TRANSPORT_LOGGING_LEVEL
 from nordicsemi.dfu.dfu_transport_serial import DfuTransportSerial
 from nordicsemi.dfu.package import Package
@@ -1220,7 +1223,7 @@ def ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flas
 
 
 def _ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, flash_connectivity,
-        att_mtu, packet_notification, bluez):
+         att_mtu, packet_notification, bluez, dfu_fault_manager: Optional[DFUFaultManager] = None):
     """
     Perform a Device Firmware Update on a device with a bootloader that supports BLE DFU.
     This requires a second nRF device, connected to this computer, with connectivity firmware
@@ -1251,7 +1254,8 @@ def _ble(package, conn_ic_id, port, connect_delay, name, address, jlink_snr, fla
                                       att_mtu=att_mtu,
                                       target_device_addr=address,
                                       prn=packet_notification,
-                                      bluez=True)
+                                      bluez=True,
+                                      dfu_fault_manager=dfu_fault_manager)
         ble_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
         dfu = Dfu(zip_file_path=package, dfu_transport=ble_backend, connect_delay=connect_delay)
 

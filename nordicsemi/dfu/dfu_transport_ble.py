@@ -37,12 +37,15 @@
 
 # Python standard library
 import time
+from typing import Optional
+
 import wrapt
 import queue
 import struct
 import logging
 import binascii
 
+from nordicsemi.dfu.dfu_faults import DFUFaultManager, DFUStage
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
 from pc_ble_driver_py.exceptions    import NordicSemiException, IllegalStateException
 from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnableParams, BLEUUIDBase, BLEGapSecKDist, BLEGapSecParams, \
@@ -449,7 +452,8 @@ class DfuTransportBle(DfuTransport):
                  target_device_addr=None,
                  baud_rate=1000000,
                  prn=0,
-                 bluez=False):
+                 bluez=False,
+                 dfu_fault_manager: Optional[DFUFaultManager] = None):
 
         super().__init__()
         DFUAdapter.LOCAL_ATT_MTU = att_mtu
@@ -462,6 +466,8 @@ class DfuTransportBle(DfuTransport):
         self.dfu_adapter        = None
         self.prn                = prn
         self.bluez              = bluez
+        self.dfu_fault_manager  = dfu_fault_manager
+        self.current_dfu_stage  = None
 
         self.bonded             = False
         self.keyset             = None
@@ -612,6 +618,13 @@ class DfuTransportBle(DfuTransport):
                 raise NordicSemiException("Failed to send firmware")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
 
+    def __handle_fault_manager_crc_validation_fault(self):
+        """ Handles simulation of CRC Validation Fault """
+        if self.dfu_fault_manager is not None:
+            fault = self.dfu_fault_manager.on_crc_validation(self.current_dfu_stage)
+            if fault is not None:
+                raise ValidationException("Simulating CRC Validation Fault")
+
     def __set_prn(self):
         logger.debug("BLE: Set Packet Receipt Notification {}".format(self.prn))
         self.dfu_adapter.write_control_point([DfuTransportBle.OP_CODE['SetPRN']] + list(struct.pack('<H', self.prn)))
@@ -644,9 +657,11 @@ class DfuTransportBle(DfuTransport):
         self.__get_response(DfuTransportBle.OP_CODE['Execute'])
 
     def __select_command(self):
+        self.current_dfu_stage = DFUStage.INIT_PACKET
         return self.__select_object(0x01)
 
     def __select_data(self):
+        self.current_dfu_stage = DFUStage.FIRMWARE_UPDATE
         return self.__select_object(0x02)
 
     def __select_object(self, object_type):
@@ -688,6 +703,7 @@ class DfuTransportBle(DfuTransport):
                 validate_crc()
 
         response = self.__calculate_checksum()
+        self.__handle_fault_manager_crc_validation_fault()
         validate_crc()
 
         return crc
