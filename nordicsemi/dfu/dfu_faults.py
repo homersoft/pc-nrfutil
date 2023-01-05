@@ -83,7 +83,7 @@ class DFUFaultsFactory:
         return DFUFault(DFUFaultType.CRC_VALIDATION, target_dfu_stage, delay_s, callback_function)
 
     @staticmethod
-    def power_off_fault(target_dfu_stage: DFUStage, delay_s: float, power_cycle_callback: Callable) -> DFUFault:
+    def create_power_off_fault(target_dfu_stage: DFUStage, delay_s: float, power_cycle_callback: Callable) -> DFUFault:
         """
         Create fault that simulates Power Off Error.
 
@@ -146,16 +146,4 @@ class DFUFaultManager:
         fault = self._get_fault(fault_type)
         if fault is not None:
             return fault.call_fault(current_dfu_stage)
-        return None
-
-    def on_crc_validation(self, current_dfu_stage: DFUStage) -> Optional[DFUFault]:
-        """
-        Function that should be called on CRC Validation.
-
-        :param current_dfu_stage: Current DFU Stage
-        :return DFUFault object if the fault was called else None
-        """
-        crc_validation_fault = self._get_fault(DFUFaultType.CRC_VALIDATION)
-        if crc_validation_fault is not None:
-            return crc_validation_fault.call_fault(current_dfu_stage)
         return None

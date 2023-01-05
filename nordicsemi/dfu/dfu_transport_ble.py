@@ -551,6 +551,8 @@ class DfuTransportBle(DfuTransport):
             try:
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
+                self.__handle_fault_manager_power_off_fault()
+                self.__handle_fault_manager_abort_fault()
                 self.__execute()
             except ValidationException as error:
                 logger.critical(f"BLE: ValidationException Error occurred during init packet send at "
@@ -604,6 +606,8 @@ class DfuTransportBle(DfuTransport):
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
+                    self.__handle_fault_manager_power_off_fault()
+                    self.__handle_fault_manager_abort_fault()
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during sending firmware chunk at "
@@ -638,23 +642,23 @@ class DfuTransportBle(DfuTransport):
             fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.CRC_VALIDATION,
                                                     current_dfu_stage=self.current_dfu_stage)
             if fault is not None:
-                raise AbortException("Simulating DFU Abort Fault by Power Off")
+                raise ValidationException("Simulating CRC Validation Fault")
 
-    def __handle_power_off_fault(self):
-        """ Handles simulation of CRC Validation Fault """
+    def __handle_fault_manager_power_off_fault(self):
+        """ Handles simulation of DFU Abort by the Power Off """
         if self.dfu_fault_manager is not None:
             fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.POWER_OFF,
                                                     current_dfu_stage=self.current_dfu_stage)
             if fault is not None:
-                raise PowerOffException("Simulating DFU Abort Fault by Power Off")
+                raise PowerOffException("Simulating DFU Abort by Power Off")
 
-    def __handle_abort_fault(self):
-        """ Handles simulation of CRC Validation Fault """
+    def __handle_fault_manager_abort_fault(self):
+        """ Handles simulation of DFU Abort """
         if self.dfu_fault_manager is not None:
             fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.ABORT,
                                                     current_dfu_stage=self.current_dfu_stage)
             if fault is not None:
-                raise ValidationException("Simulating CRC Validation Fault")
+                raise AbortException("Simulating DFU Abort")
 
     def __set_prn(self):
         logger.debug("BLE: Set Packet Receipt Notification {}".format(self.prn))
