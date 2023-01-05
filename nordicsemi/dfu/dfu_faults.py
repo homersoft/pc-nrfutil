@@ -7,6 +7,8 @@ from typing import Callable, Optional
 class DFUFaultType(Enum):
     """ Enumerator class representing all available types of fault """
     CRC_VALIDATION = "CRC VALIDATION"
+    POWER_OFF = "POWER OFF"
+    ABORT = "ABORT"
 
 
 class DFUStage(Enum):
@@ -80,6 +82,33 @@ class DFUFaultsFactory:
         """
         return DFUFault(DFUFaultType.CRC_VALIDATION, target_dfu_stage, delay_s, callback_function)
 
+    @staticmethod
+    def power_off_fault(target_dfu_stage: DFUStage, delay_s: float, power_cycle_callback: Callable) -> DFUFault:
+        """
+        Create fault that simulates Power Off Error.
+
+        :param target_dfu_stage: desired DFU stage during which the fault should be generated
+        :param delay_s: delay in seconds (counted from first possible fault call in the target DFU stage) after which
+                        fault should be generated. None to generate fault on every possible call (permanent fault).
+        :param power_cycle_callback: power cycle function callback that will be called when fault should occur
+        :return DFUFault object with defined POWER_OFF fault details
+        """
+        return DFUFault(DFUFaultType.POWER_OFF, target_dfu_stage, delay_s, power_cycle_callback)
+
+    @staticmethod
+    def create_abort_fault(target_dfu_stage: DFUStage, delay_s: Optional[float] = 0,
+                           callback_function: Optional[Callable] = None) -> DFUFault:
+        """
+        Create fault that simulates aborting the DFU.
+
+        :param target_dfu_stage: desired DFU stage during which the fault should be generated
+        :param delay_s: delay in seconds (counted from first possible fault call in the target DFU stage) after which
+                        fault should be generated. None to generate fault on every possible call (permanent fault).
+        :param callback_function: function that will be called when fault should occur
+        :return DFUFault object with defined ABORT fault details
+        """
+        return DFUFault(DFUFaultType.ABORT, target_dfu_stage, delay_s, callback_function)
+
 
 class DFUFaultManager:
     """ DFU Fault Manager class for handling simulation of all possible faults during DFU procedure """
@@ -102,6 +131,22 @@ class DFUFaultManager:
         :param fault_type: type of the dfu fault
         """
         return self.dfu_faults.get(fault_type, None)
+
+    def on_fault(self, fault_type: DFUFaultType, current_dfu_stage: DFUStage):
+        """
+        Function that should be called on fault conditions.
+        NOTE: This function does not simulate the exact fault but only provides the information if the fault should
+        be called on the DFU controller side. This means that if the fault conditions are met then the fault details
+        are returned and the DFU controller should raise an error.
+
+        :param fault_type: fault type that should be called. E.g. DfuFaultType.CRC_VALIDATION
+        :param current_dfu_stage: Current DFU Stage
+        :return DFUFault object if the fault was called else None
+        """
+        fault = self._get_fault(fault_type)
+        if fault is not None:
+            return fault.call_fault(current_dfu_stage)
+        return None
 
     def on_crc_validation(self, current_dfu_stage: DFUStage) -> Optional[DFUFault]:
         """

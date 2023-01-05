@@ -45,7 +45,7 @@ import struct
 import logging
 import binascii
 
-from nordicsemi.dfu.dfu_faults import DFUFaultManager, DFUStage
+from nordicsemi.dfu.dfu_faults import DFUFaultManager, DFUStage, DFUFaultType
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
 from pc_ble_driver_py.exceptions    import NordicSemiException, IllegalStateException
 from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnableParams, BLEUUIDBase, BLEGapSecKDist, BLEGapSecParams, \
@@ -64,6 +64,20 @@ nrf_sd_ble_api_ver = config.sd_api_ver_get()
 class ValidationException(NordicSemiException):
     """"
     Exception used when validation failed
+    """
+    pass
+
+
+class PowerOffException(NordicSemiException):
+    """"
+    Exception used when DFU is aborted because of the Power Off
+    """
+    pass
+
+
+class AbortException(NordicSemiException):
+    """"
+    Exception used when DFU is aborted
     """
     pass
 
@@ -621,7 +635,24 @@ class DfuTransportBle(DfuTransport):
     def __handle_fault_manager_crc_validation_fault(self):
         """ Handles simulation of CRC Validation Fault """
         if self.dfu_fault_manager is not None:
-            fault = self.dfu_fault_manager.on_crc_validation(self.current_dfu_stage)
+            fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.CRC_VALIDATION,
+                                                    current_dfu_stage=self.current_dfu_stage)
+            if fault is not None:
+                raise AbortException("Simulating DFU Abort Fault by Power Off")
+
+    def __handle_power_off_fault(self):
+        """ Handles simulation of CRC Validation Fault """
+        if self.dfu_fault_manager is not None:
+            fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.POWER_OFF,
+                                                    current_dfu_stage=self.current_dfu_stage)
+            if fault is not None:
+                raise PowerOffException("Simulating DFU Abort Fault by Power Off")
+
+    def __handle_abort_fault(self):
+        """ Handles simulation of CRC Validation Fault """
+        if self.dfu_fault_manager is not None:
+            fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.ABORT,
+                                                    current_dfu_stage=self.current_dfu_stage)
             if fault is not None:
                 raise ValidationException("Simulating CRC Validation Fault")
 
