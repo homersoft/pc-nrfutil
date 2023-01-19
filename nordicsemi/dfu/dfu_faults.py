@@ -27,7 +27,7 @@ class DFUStage:
 
     @progress.setter
     def progress(self, value: float):
-        self._progress = min(value, 100)
+        self._progress = min(100.0, max(0.0, value))
 
 
 class DFUStageName(Enum):
