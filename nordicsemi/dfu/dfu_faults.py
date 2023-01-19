@@ -26,7 +26,7 @@ class DFUStage:
         return self._progress
 
     @progress.setter
-    def progress(self, value):
+    def progress(self, value: float):
         self._progress = min(value, 100)
 
 
