@@ -13,7 +13,11 @@ class DFUFaultType(Enum):
 
 @dataclass
 class DFUStage:
-    """ Class for keeping DFU Stage details """
+    """
+    Class for keeping DFU Stage details:
+    - name: name of the DFU stage. E.g. DFUStageName.INIT_PACKET
+    - progress: DFU stage progress given as a percentage value in range 0-100 %
+    """
     name: Optional[DFUStageName] = None
     progress: float = 0
 
