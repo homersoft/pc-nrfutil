@@ -625,7 +625,7 @@ class DfuTransportBle(DfuTransport):
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
-            self.current_dfu_stage.progress = min(((current_offset + response['max_size']) / len(firmware)) * 100, 100)
+            self.current_dfu_stage.progress = ((current_offset + response['max_size']) / len(firmware)) * 100
             logger.debug(f"Current progress: {self.current_dfu_stage.progress:.2f} %")
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=self.current_dfu_stage.progress)
 

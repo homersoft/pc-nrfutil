@@ -19,7 +19,15 @@ class DFUStage:
     - progress: DFU stage progress given as a percentage value in range 0-100 %
     """
     name: Optional[DFUStageName] = None
-    progress: float = 0
+    _progress: float = 0
+
+    @property
+    def progress(self):
+        return self._progress
+
+    @progress.setter
+    def progress(self, value):
+        self._progress = min(value, 100)
 
 
 class DFUStageName(Enum):
