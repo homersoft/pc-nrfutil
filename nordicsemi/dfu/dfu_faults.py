@@ -1,6 +1,5 @@
 from __future__ import annotations  # enabling support for defining typing for self inside the DFUFault class
 
-from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional
 
@@ -11,23 +10,27 @@ class DFUFaultType(Enum):
     ABORT = "ABORT"
 
 
-@dataclass
 class DFUStage:
     """
     Class for keeping DFU Stage details:
     - name: name of the DFU stage. E.g. DFUStageName.INIT_PACKET
     - progress: DFU stage progress given as a percentage value in range 0-100 %
     """
-    name: Optional[DFUStageName] = None
-    _progress: float = 0
+    def __init__(self, name: Optional[DFUStageName] = None, progress: float = 0.0):
+        self.name = name
+        self._progress = self._clip_progress(progress)
 
     @property
-    def progress(self):
+    def progress(self) -> float:
         return self._progress
 
     @progress.setter
     def progress(self, value: float):
-        self._progress = min(100.0, max(0.0, value))
+        self._progress = self._clip_progress(value)
+
+    @staticmethod
+    def _clip_progress(value: float) -> float:
+        return min(100.0, max(0.0, value))
 
 
 class DFUStageName(Enum):
