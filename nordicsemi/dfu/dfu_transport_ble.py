@@ -45,7 +45,7 @@ import struct
 import logging
 import binascii
 
-from nordicsemi.dfu.dfu_faults import DFUFaultManager, DFUStage
+from nordicsemi.dfu.dfu_faults import DFUFaultManager, DFUStage, DFUStageName, DFUFaultType
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent
 from pc_ble_driver_py.exceptions    import NordicSemiException, IllegalStateException
 from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnableParams, BLEUUIDBase, BLEGapSecKDist, BLEGapSecParams, \
@@ -62,10 +62,11 @@ nrf_sd_ble_api_ver = config.sd_api_ver_get()
 
 
 class ValidationException(NordicSemiException):
-    """"
-    Exception used when validation failed
-    """
-    pass
+    """ Exception used when validation failed """
+
+
+class AbortException(NordicSemiException):
+    """ Exception used when DFU is aborted """
 
 
 class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
@@ -467,7 +468,7 @@ class DfuTransportBle(DfuTransport):
         self.prn                = prn
         self.bluez              = bluez
         self.dfu_fault_manager  = dfu_fault_manager
-        self.current_dfu_stage  = None
+        self.current_dfu_stage  = DFUStage()
 
         self.bonded             = False
         self.keyset             = None
@@ -533,11 +534,15 @@ class DfuTransportBle(DfuTransport):
         if try_to_recover():
             return
 
+        self.current_dfu_stage.name = DFUStageName.INIT_PACKET
+        self.current_dfu_stage.progress = 0
         for r in range(DfuTransportBle.RETRIES_NUMBER):
             try:
                 self.__create_command(len(init_packet))
                 self.__stream_data(data=init_packet)
+                self.__handle_fault_manager_abort_fault()
                 self.__execute()
+                self.current_dfu_stage.progress = 100
             except ValidationException as error:
                 logger.critical(f"BLE: ValidationException Error occurred during init packet send at "
                                 f"attempt {r + 1}: {error}")
@@ -545,6 +550,7 @@ class DfuTransportBle(DfuTransport):
             break
         else:
             raise NordicSemiException("Failed to send init packet")
+        self.__handle_fault_manager_abort_fault()
 
     def send_firmware(self, firmware):
         def try_to_recover():
@@ -583,6 +589,8 @@ class DfuTransportBle(DfuTransport):
         response['crc'] = 0
         try_to_recover()
 
+        self.current_dfu_stage.name = DFUStageName.FIRMWARE_UPDATE
+        self.current_dfu_stage.progress = 0
         for current_offset in range(response['offset'], len(firmware), response['max_size']):
             logger.debug(f"Sending firmware chunk from offset: {current_offset}")
             data = firmware[current_offset:current_offset+response['max_size']]
@@ -590,6 +598,7 @@ class DfuTransportBle(DfuTransport):
                 try:
                     self.__create_data(len(data))
                     response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=current_offset)
+                    self.__handle_fault_manager_abort_fault()
                     self.__execute()
                 except ValidationException as error:
                     logger.critical("BLE: ValidationException Error occurred during sending firmware chunk at "
@@ -616,14 +625,27 @@ class DfuTransportBle(DfuTransport):
                 break
             else:
                 raise NordicSemiException("Failed to send firmware")
-            self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
+            self.current_dfu_stage.progress = ((current_offset + response['max_size']) / len(firmware)) * 100
+            logger.debug(f"Current progress: {self.current_dfu_stage.progress:.2f} %")
+            self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=self.current_dfu_stage.progress)
+
+        self.__handle_fault_manager_abort_fault()
 
     def __handle_fault_manager_crc_validation_fault(self):
         """ Handles simulation of CRC Validation Fault """
         if self.dfu_fault_manager is not None:
-            fault = self.dfu_fault_manager.on_crc_validation(self.current_dfu_stage)
+            fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.CRC_VALIDATION,
+                                                    current_dfu_stage=self.current_dfu_stage)
             if fault is not None:
                 raise ValidationException("Simulating CRC Validation Fault")
+
+    def __handle_fault_manager_abort_fault(self):
+        """ Handles simulation of DFU Abort """
+        if self.dfu_fault_manager is not None:
+            fault = self.dfu_fault_manager.on_fault(fault_type=DFUFaultType.ABORT,
+                                                    current_dfu_stage=self.current_dfu_stage)
+            if fault is not None:
+                raise AbortException("Simulating DFU Abort")
 
     def __set_prn(self):
         logger.debug("BLE: Set Packet Receipt Notification {}".format(self.prn))
@@ -657,11 +679,9 @@ class DfuTransportBle(DfuTransport):
         self.__get_response(DfuTransportBle.OP_CODE['Execute'])
 
     def __select_command(self):
-        self.current_dfu_stage = DFUStage.INIT_PACKET
         return self.__select_object(0x01)
 
     def __select_data(self):
-        self.current_dfu_stage = DFUStage.FIRMWARE_UPDATE
         return self.__select_object(0x02)
 
     def __select_object(self, object_type):
