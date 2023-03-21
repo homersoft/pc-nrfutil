@@ -53,7 +53,7 @@ from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnab
 from pc_ble_driver_py.ble_driver    import ATT_MTU_DEFAULT, BLEConfig, BLEConfigConnGatt, BLEConfigConnGap
 from pc_ble_driver_py.ble_adapter   import BLEAdapter, BLEAdapterObserver, EvtSync
 
-logger  = logging.getLogger(__name__)
+logger  = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 from pc_ble_driver_py import config

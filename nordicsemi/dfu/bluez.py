@@ -17,7 +17,7 @@ from pc_ble_driver_py.ble_driver import BLEUUID, BLEUUIDBase, BLEGapAddr, BLEAdv
 from pc_ble_driver_py.exceptions import NordicSemiException
 from pc_ble_driver_py.observers import BLEAdapterObserver, BLEDriverObserver
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 BLUEZ_SERVICE = "org.bluez"
 ROOT_OBJ = "/"
