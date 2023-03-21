@@ -447,6 +447,8 @@ class BluezConnectionManager(object):
 class BluezDriver(object):
     """ Class is responsible for calling low level operations on BlueZ stack. """
 
+    ESTABLISHING_CONNECTION_TIMEOUT_S = 30
+
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
@@ -529,13 +531,17 @@ class BluezDriver(object):
         :param scan_params: None, scan parameters 
         :param conn_params: BLEGapConnParams, connection parameters
         """
-        self.ble_gap_scan_stop()
         dev = self.devices[address.addr.hex()]
         if dev is None:
             raise RuntimeError("Could not find device with address")
 
-        if not dev.connect():
-            raise RuntimeError("Could not connect to device: {}".format(binascii.hexlify(address.addr)))
+        start_time = time.time()
+        while (time.time() - start_time) < self.ESTABLISHING_CONNECTION_TIMEOUT_S:
+            if dev.connect():
+                break
+        else:
+            raise RuntimeError(f"Could not connect to device : {binascii.hexlify(address.addr)} within "
+                               f"{self.ESTABLISHING_CONNECTION_TIMEOUT_S} s.")
 
         conn_handle = self.conn_manager.create_new_connection(dev)
 
@@ -545,6 +551,7 @@ class BluezDriver(object):
                                      peer_addr = address,
                                      role = BLEGapRoles.periph,
                                      conn_params = conn_params)
+        self.ble_gap_scan_stop()
 
     def ble_gap_disconnect(self, conn_handle):
         """ Disconnect from device.
