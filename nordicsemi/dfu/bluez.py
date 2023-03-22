@@ -531,6 +531,7 @@ class BluezDriver(object):
         :param scan_params: None, scan parameters 
         :param conn_params: BLEGapConnParams, connection parameters
         """
+        self.ble_gap_scan_stop()
         dev = self.devices[address.addr.hex()]
         if dev is None:
             raise RuntimeError("Could not find device with address")
@@ -551,7 +552,6 @@ class BluezDriver(object):
                                      peer_addr = address,
                                      role = BLEGapRoles.periph,
                                      conn_params = conn_params)
-        self.ble_gap_scan_stop()
 
     def ble_gap_disconnect(self, conn_handle):
         """ Disconnect from device.
