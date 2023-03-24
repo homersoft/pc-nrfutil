@@ -46,7 +46,7 @@ import tempfile
 # Nordic libraries
 from nordicsemi.dfu.package         import Package
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class Dfu:

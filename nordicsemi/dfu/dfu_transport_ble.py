@@ -53,7 +53,7 @@ from pc_ble_driver_py.ble_driver    import BLEDriver, BLEDriverObserver, BLEEnab
 from pc_ble_driver_py.ble_driver    import ATT_MTU_DEFAULT, BLEConfig, BLEConfigConnGatt, BLEConfigConnGap
 from pc_ble_driver_py.ble_adapter   import BLEAdapter, BLEAdapterObserver, EvtSync
 
-logger  = logging.getLogger(__name__)
+logger  = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 from pc_ble_driver_py import config
@@ -87,7 +87,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
     ERROR_CODE_POS        = 2
     LOCAL_ATT_MTU         = 247
 
-    def __init__(self, adapter, bonded=False, keyset=None):
+    def __init__(self, adapter, bonded=False, keyset=None, att_mtu=ATT_MTU_DEFAULT):
         super().__init__()
 
         self.evt_sync           = EvtSync(['connected', 'disconnected', 'sec_params',
@@ -98,7 +98,7 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
         self.keyset             = keyset
         self.notifications_q    = queue.Queue()
         self.indication_q       = queue.Queue()
-        self.att_mtu            = ATT_MTU_DEFAULT
+        self.att_mtu            = att_mtu
         self.packet_size        = self.att_mtu - 3
         self.adapter.observer_register(self)
         self.adapter.driver.observer_register(self)
@@ -448,7 +448,7 @@ class DfuTransportBle(DfuTransport):
 
     def __init__(self,
                  serial_port,
-                 att_mtu,
+                 att_mtu=ATT_MTU_DEFAULT,
                  target_device_name=None,
                  target_device_addr=None,
                  baud_rate=1000000,
@@ -485,7 +485,7 @@ class DfuTransportBle(DfuTransport):
         else:
             driver  = DfuBLEDriver(serial_port = self.serial_port, baud_rate   = self.baud_rate)
             adapter = BLEAdapter(driver)
-        self.dfu_adapter = DFUAdapter(adapter=adapter, bonded=self.bonded, keyset=self.keyset)
+        self.dfu_adapter = DFUAdapter(adapter=adapter, bonded=self.bonded, keyset=self.keyset, att_mtu=self.att_mtu)
         self.dfu_adapter.open()
         self.target_device_name, self.target_device_addr = self.dfu_adapter.connect(
                                                         target_device_name = self.target_device_name,

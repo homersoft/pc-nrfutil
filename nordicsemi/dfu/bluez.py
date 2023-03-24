@@ -17,7 +17,7 @@ from pc_ble_driver_py.ble_driver import BLEUUID, BLEUUIDBase, BLEGapAddr, BLEAdv
 from pc_ble_driver_py.exceptions import NordicSemiException
 from pc_ble_driver_py.observers import BLEAdapterObserver, BLEDriverObserver
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 BLUEZ_SERVICE = "org.bluez"
 ROOT_OBJ = "/"
@@ -447,6 +447,8 @@ class BluezConnectionManager(object):
 class BluezDriver(object):
     """ Class is responsible for calling low level operations on BlueZ stack. """
 
+    ESTABLISHING_CONNECTION_TIMEOUT_S = 30
+
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
@@ -534,8 +536,13 @@ class BluezDriver(object):
         if dev is None:
             raise RuntimeError("Could not find device with address")
 
-        if not dev.connect():
-            raise RuntimeError("Could not connect to device: {}".format(binascii.hexlify(address.addr)))
+        start_time = time.time()
+        while (time.time() - start_time) < self.ESTABLISHING_CONNECTION_TIMEOUT_S:
+            if dev.connect():
+                break
+        else:
+            raise RuntimeError(f"Could not connect to device : {binascii.hexlify(address.addr)} within "
+                               f"{self.ESTABLISHING_CONNECTION_TIMEOUT_S} s.")
 
         conn_handle = self.conn_manager.create_new_connection(dev)
 
