@@ -399,7 +399,8 @@ class DFUAdapter(BLEDriverObserver, BLEAdapterObserver):
             # set with BLEConfigConnGatt (that implicitly operates
             # on connections with tag 1) to allow for larger MTU.
             self.adapter.connect(address=peer_addr,
-                                 conn_params=self.conn_params)
+                                 conn_params=self.conn_params,
+                                 tag=1)
             # store the address for subsequent connections
             self.target_device_addr = address_string
             self.target_device_addr_type = peer_addr
