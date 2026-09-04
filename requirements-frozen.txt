@@ -4,10 +4,15 @@ crcmod==1.7
 ecdsa==0.17.0
 intelhex==2.3.0
 libusb1==1.9.3
-pc-ble-driver-py==0.17.0
+# See requirements.txt for why this points at embedded-community's abi3 wheels
+# instead of a version number.
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-linux_x86_64.whl ; sys_platform == "linux"
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-win_amd64.whl ; sys_platform == "win32"
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-macosx_13_0_x86_64.whl ; sys_platform == "darwin" and platform_machine == "x86_64"
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-macosx_14_0_arm64.whl ; sys_platform == "darwin" and platform_machine == "arm64"
 piccata==2.0.1
 protobuf==3.17.3
 pyserial==3.5
 pyspinel==1.0.3
-PyYAML==5.4.1
+PyYAML==6.0.3
 tqdm==4.62.0
