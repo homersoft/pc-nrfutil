@@ -119,7 +119,9 @@ build_dir = os.environ.get("NRFUTIL_BUILD_DIR", "./{}".format(version.NRFUTIL_VE
 description = """A Python package that includes the nrfutil utility and the nordicsemi library"""
 
 with open("requirements.txt") as reqs_file:
-    reqs = reqs_file.readlines()
+    # requirements.txt carries pip-only directive lines (e.g. --extra-index-url) that
+    # install_requires can't parse as requirement specifiers.
+    reqs = [line for line in reqs_file.readlines() if not line.lstrip().startswith("-")]
 
 
 setup(

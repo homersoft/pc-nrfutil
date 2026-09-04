@@ -636,12 +636,14 @@ class BluezBleAdapter(object):
         self.conn_in_progress = False
         self.db_conns = dict()
 
-    def connect(self, address, scan_params=None, conn_params=None):
+    def connect(self, address, scan_params=None, conn_params=None, tag=None):
         """Connect to device.
 
         :param address: BLEGapAddr, device address
         :param scan_params: None, scan params
         :param conn_params: BLEGapConnParams, conn params
+        :param tag: unused; BlueZ has no equivalent of the nRF52 dongle's per-connection tags
+            (used elsewhere to select the BLEConfigConnGatt MTU settings for tag=1 connections)
         """
         if self.conn_in_progress:
             return
