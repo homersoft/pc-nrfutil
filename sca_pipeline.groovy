@@ -1,22 +1,29 @@
-// This is a Jenkins pipeline file used to perform a static code analysis and automatic tagging with a new version
-// number ( in x.y.z notation) when a merge to a certain branch is made. Automatic tagging increase only last digit (z)
-// in the new version number. When you want to change first (x) or second (y) digit in the new version number you have
-// to use ALTERNATIVE_VERSION parameter in Jenkins job.
-// For the status to be visible on GitHub, you have to add "seedlabs-ateam" collaborator & add "Jenkins (Git plugin)"
-// service to your git repository.
-// During the first launch, you have to enter ALTERNATIVE_VERSION parameter.
+@Library('JenkinsMain@2.34.0')_
 
 
-@Library('JenkinsMain@2.19.21')_
-
-
-pipelinePythonSCA(
-    baseBranch: "master",
+pipelinePySCA(
     agentLabel: "pylint",
-    pythonVersion: '3.8',
-    additionalAptPkgs: 'libgirepository1.0-dev libdbus-glib-1-dev',
-    installFromSetup: true,
-    runPipCheck: true,
-    runUnitTests: false,
-    credentials: '1479b83d-f7b2-4823-8105-549616393cc5'
+    pythonVersion: "3.14",
+    baseBranch: "master",
+    additionalAptPkgs: "pkg-config libdbus-1-dev libdbus-glib-1-dev libgirepository-2.0-dev",
+    credentials: "1479b83d-f7b2-4823-8105-549616393cc5",
+    install: {
+        sh("pip install --upgrade pip")
+        // requirements-frozen.txt first so the exact pins win the resolve over the
+        // loose ranges pulled in transitively by requirements-dev.txt -> requirements.txt
+        sh("pip install -r requirements-frozen.txt -r requirements-dev.txt")
+        sh("pip install -e . --no-deps")
+    },
+    build: {
+        sh("pip install --upgrade build")
+        sh("python -m build --wheel")
+    },
+    checks: [
+        DependencyCheck: {
+            runScriptAndSetGitStatus("pip check", "Dependency Check")
+        },
+        Tests: {
+            runScriptAndSetGitStatus("pytest", "Unit Tests")
+        },
+    ],
 )
