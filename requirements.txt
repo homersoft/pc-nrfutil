@@ -5,7 +5,13 @@ dbus-python
 ecdsa
 intelhex
 libusb1==1.9.3
-pc_ble_driver_py >= 0.16.4
+# Nordic's official pc-ble-driver-py is archived and never shipped a build newer than
+# cp310. These are the community-maintained abi3 (Python-version-agnostic) wheels from
+# https://github.com/embedded-community/pc-ble-driver-py, verified against Python 3.14.
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-linux_x86_64.whl ; sys_platform == "linux"
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-win_amd64.whl ; sys_platform == "win32"
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-macosx_13_0_x86_64.whl ; sys_platform == "darwin" and platform_machine == "x86_64"
+pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-macosx_14_0_arm64.whl ; sys_platform == "darwin" and platform_machine == "arm64"
 piccata
 protobuf >=3.17.3, < 4.0.0
 pyserial
