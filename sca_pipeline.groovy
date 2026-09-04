@@ -14,6 +14,10 @@ pipelinePySCA(
         sh("pip install -r requirements-frozen.txt -r requirements-dev.txt")
         sh("pip install -e . --no-deps")
     },
+    build: {
+        sh("pip install --upgrade build")
+        sh("python -m build --wheel")
+    },
     checks: [
         DependencyCheck: {
             runScriptAndSetGitStatus("pip check", "Dependency Check")
