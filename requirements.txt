@@ -1,3 +1,6 @@
+--extra-index-url http://pypi.silvair.lan/simple
+--trusted-host pypi.silvair.lan
+
 antlib >= 1.1b0; sys_platform == 'win32'
 click
 crcmod
@@ -6,12 +9,10 @@ ecdsa
 intelhex
 libusb1==1.9.3
 # Nordic's official pc-ble-driver-py is archived and never shipped a build newer than
-# cp310. These are the community-maintained abi3 (Python-version-agnostic) wheels from
-# https://github.com/embedded-community/pc-ble-driver-py, verified against Python 3.14.
-pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-linux_x86_64.whl ; sys_platform == "linux"
-pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-win_amd64.whl ; sys_platform == "win32"
-pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-macosx_13_0_x86_64.whl ; sys_platform == "darwin" and platform_machine == "x86_64"
-pc_ble_driver_py @ https://github.com/embedded-community/pc-ble-driver-py/releases/download/v0.17.9/pc_ble_driver_py-0.17.9-cp34-abi3-macosx_14_0_arm64.whl ; sys_platform == "darwin" and platform_machine == "arm64"
+# cp310. This is Silvair's own fork/build (github.com/.../pc-ble-driver-py), published
+# to pypi.silvair.lan, verified against Python 3.14. Linux-only for now; win32/darwin
+# builds are not published yet.
+pc_ble_driver_py_silvair==0.18.0 ; sys_platform == "linux"
 piccata
 protobuf >=3.17.3, < 4.0.0
 pyserial
