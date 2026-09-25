@@ -62,9 +62,7 @@ class ValidationException(NordicSemiException):
 
 
 class AbortException(NordicSemiException):
-    """"
-    Exception used when DFU Abort fault is simulated
-    """
+    """ Exception used when DFU Abort fault is simulated """
     pass
 
 
