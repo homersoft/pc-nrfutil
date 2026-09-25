@@ -1011,7 +1011,7 @@ def dfu():
     pass
 
 def do_serial(package, port, connect_delay, flow_control, packet_receipt_notification, baud_rate, serial_number, ping,
-              timeout):
+              timeout, dfu_fault_manager: Optional[DFUFaultManager] = None):
 
     if flow_control is None:
         flow_control = DfuTransportSerial.DEFAULT_FLOW_CONTROL
@@ -1035,7 +1035,7 @@ def do_serial(package, port, connect_delay, flow_control, packet_receipt_notific
     logger.info("Using board at serial port: {}".format(port))
     serial_backend = DfuTransportSerial(com_port=str(port), baud_rate=baud_rate,
                                         flow_control=flow_control, prn=packet_receipt_notification, do_ping=ping,
-                                        timeout=timeout)
+                                        timeout=timeout, dfu_fault_manager=dfu_fault_manager)
     serial_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
     dfu = Dfu(zip_file_path = package, dfu_transport = serial_backend, connect_delay = connect_delay)
 
