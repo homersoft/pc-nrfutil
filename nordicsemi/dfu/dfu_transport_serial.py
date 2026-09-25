@@ -162,6 +162,7 @@ class DfuTransportSerial(DfuTransport):
     DEFAULT_SERIAL_PORT_TIMEOUT = 1.0  # Timeout time on serial port read
     DEFAULT_PRN                 = 0
     DEFAULT_DO_PING = True
+    RETRIES_NUMBER = 3
 
     OP_CODE = {
         'CreateObject'          : 0x01,
@@ -264,13 +265,19 @@ class DfuTransportSerial(DfuTransport):
 
         self.current_dfu_stage.name = DFUStageName.INIT_PACKET
         self.current_dfu_stage.progress = 0
-        try:
-            self.__create_command(len(init_packet))
-            self.__stream_data(data=init_packet)
-            self.__handle_fault_manager_abort_fault()
-            self.__execute()
-            self.current_dfu_stage.progress = 100
-        except ValidationException:
+        for r in range(DfuTransportSerial.RETRIES_NUMBER):
+            try:
+                self.__create_command(len(init_packet))
+                self.__stream_data(data=init_packet)
+                self.__handle_fault_manager_abort_fault()
+                self.__execute()
+                self.current_dfu_stage.progress = 100
+            except ValidationException as error:
+                logger.critical(f"Serial: ValidationException Error occurred during init packet send at "
+                                f"attempt {r + 1}: {error}")
+                continue
+            break
+        else:
             raise NordicSemiException("Failed to send init packet")
         self.__handle_fault_manager_abort_fault()
 
@@ -316,12 +323,18 @@ class DfuTransportSerial(DfuTransport):
         self.current_dfu_stage.progress = 0
         for i in range(response['offset'], len(firmware), response['max_size']):
             data = firmware[i:i+response['max_size']]
-            try:
-                self.__create_data(len(data))
-                response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
-                self.__handle_fault_manager_abort_fault()
-                self.__execute()
-            except ValidationException:
+            for r in range(DfuTransportSerial.RETRIES_NUMBER):
+                try:
+                    self.__create_data(len(data))
+                    response['crc'] = self.__stream_data(data=data, crc=response['crc'], offset=i)
+                    self.__handle_fault_manager_abort_fault()
+                    self.__execute()
+                except ValidationException as error:
+                    logger.critical(f"Serial: ValidationException Error occurred during sending firmware "
+                                    f"chunk at attempt {r + 1}: {error}")
+                    continue
+                break
+            else:
                 raise NordicSemiException("Failed to send firmware")
 
             self.current_dfu_stage.progress = ((i + response['max_size']) / len(firmware)) * 100
